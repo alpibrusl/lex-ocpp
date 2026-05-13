@@ -1,0 +1,24 @@
+{
+  "title": "WebhookEvent",
+  "description": "Discriminated-union demo — signup vs purchase",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["kind", "user_id", "email"],
+      "properties": {
+        "kind": {"const": "signup"},
+        "user_id": {"type": "string", "minLength": 1},
+        "email": {"type": "string", "format": "email"}
+      }
+    },
+    {
+      "type": "object",
+      "required": ["kind", "user_id", "amount_cents"],
+      "properties": {
+        "kind": {"const": "purchase"},
+        "user_id": {"type": "string", "minLength": 1},
+        "amount_cents": {"type": "integer", "minimum": 1}
+      }
+    }
+  ]
+}

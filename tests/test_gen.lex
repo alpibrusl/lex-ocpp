@@ -148,6 +148,176 @@ fn test_invalid_json() -> Result[Unit, Str] {
   }
 }
 
+# ============================================================
+# Extensions in v0.3 (#1) — $ref, oneOf, pattern, format hints
+# ============================================================
+
+fn test_pattern_constraint() -> Result[Unit, Str] {
+  let schema := "{\"title\":\"Phone\",\"type\":\"object\","
+             + "\"required\":[\"v\"],"
+             + "\"properties\":{"
+             +   "\"v\":{\"type\":\"string\","
+             +   "\"pattern\":\"^\\\\+[1-9][0-9]+$\"}"
+             + "}}"
+  match gen.generate(schema) {
+    Err(e) => fail(str.concat("parse: ", e)),
+    Ok(src) => assert_contains(src, "StrPattern(", "pattern check"),
+  }
+}
+
+fn test_format_email() -> Result[Unit, Str] {
+  let schema := "{\"title\":\"Contact\",\"type\":\"object\","
+             + "\"required\":[\"email\"],"
+             + "\"properties\":{"
+             +   "\"email\":{\"type\":\"string\",\"format\":\"email\"}"
+             + "}}"
+  match gen.generate(schema) {
+    Err(e) => fail(str.concat("parse: ", e)),
+    Ok(src) => assert_contains(src, "StrEmail", "email format"),
+  }
+}
+
+fn test_format_uri() -> Result[Unit, Str] {
+  let schema := "{\"title\":\"Link\",\"type\":\"object\","
+             + "\"required\":[\"href\"],"
+             + "\"properties\":{"
+             +   "\"href\":{\"type\":\"string\",\"format\":\"uri\"}"
+             + "}}"
+  match gen.generate(schema) {
+    Err(e) => fail(str.concat("parse: ", e)),
+    Ok(src) => assert_contains(src, "StrUrl", "uri format → StrUrl"),
+  }
+}
+
+fn test_format_uuid() -> Result[Unit, Str] {
+  let schema := "{\"title\":\"Entity\",\"type\":\"object\","
+             + "\"required\":[\"id\"],"
+             + "\"properties\":{"
+             +   "\"id\":{\"type\":\"string\",\"format\":\"uuid\"}"
+             + "}}"
+  match gen.generate(schema) {
+    Err(e) => fail(str.concat("parse: ", e)),
+    Ok(src) => assert_contains(src, "StrUuid", "uuid format"),
+  }
+}
+
+fn test_format_unknown_dropped() -> Result[Unit, Str] {
+  # Unknown formats must be silently dropped per JSON Schema spec.
+  let schema := "{\"title\":\"X\",\"type\":\"object\","
+             + "\"required\":[\"v\"],"
+             + "\"properties\":{"
+             +   "\"v\":{\"type\":\"string\",\"format\":\"klingon-glyph\"}"
+             + "}}"
+  match gen.generate(schema) {
+    Err(e) => fail(str.concat("parse: ", e)),
+    Ok(src) => {
+      # The check list should be empty (no constraint emitted for the
+      # unknown format). Just verify we didn't error and didn't emit
+      # a fake "StrKlingon" constraint.
+      if str.contains(src, "Klingon") { fail("unknown format leaked") }
+      else { pass() }
+    },
+  }
+}
+
+fn test_ref_resolution() -> Result[Unit, Str] {
+  let schema := "{\"title\":\"Auth\",\"type\":\"object\","
+             + "\"$defs\":{"
+             +   "\"IdToken\":{"
+             +     "\"type\":\"object\","
+             +     "\"required\":[\"idToken\"],"
+             +     "\"properties\":{"
+             +       "\"idToken\":{\"type\":\"string\"}"
+             +     "}"
+             +   "}"
+             + "},"
+             + "\"required\":[\"idToken\"],"
+             + "\"properties\":{"
+             +   "\"idToken\":{\"$ref\":\"#/$defs/IdToken\"}"
+             + "}}"
+  match gen.generate(schema) {
+    Err(e) => fail(str.concat("parse: ", e)),
+    Ok(src) =>
+      match assert_contains(src, "fn id_token_schema()", "helper for $defs entry") {
+        Err(why) => Err(why),
+        Ok(_)    => assert_contains(src,
+          "s.required_object(\"idToken\", id_token_schema())", "$ref call site"),
+      },
+  }
+}
+
+fn test_ref_in_array_items() -> Result[Unit, Str] {
+  let schema := "{\"title\":\"Bag\",\"type\":\"object\","
+             + "\"$defs\":{"
+             +   "\"Item\":{"
+             +     "\"type\":\"object\","
+             +     "\"required\":[\"id\"],"
+             +     "\"properties\":{\"id\":{\"type\":\"integer\"}}"
+             +   "}"
+             + "},"
+             + "\"required\":[\"items\"],"
+             + "\"properties\":{"
+             +   "\"items\":{\"type\":\"array\","
+             +   "\"items\":{\"$ref\":\"#/$defs/Item\"},"
+             +   "\"minItems\":1}"
+             + "}}"
+  match gen.generate(schema) {
+    Err(e) => fail(str.concat("parse: ", e)),
+    Ok(src) => assert_contains(src, "KObject(item_schema())", "array of $refs"),
+  }
+}
+
+fn test_definitions_keyword() -> Result[Unit, Str] {
+  # Older JSON Schema drafts use `definitions` instead of `$defs`.
+  let schema := "{\"title\":\"OldDraft\",\"type\":\"object\","
+             + "\"definitions\":{"
+             +   "\"Legacy\":{"
+             +     "\"type\":\"object\","
+             +     "\"required\":[\"x\"],"
+             +     "\"properties\":{\"x\":{\"type\":\"integer\"}}"
+             +   "}"
+             + "},"
+             + "\"required\":[\"legacy\"],"
+             + "\"properties\":{"
+             +   "\"legacy\":{\"$ref\":\"#/definitions/Legacy\"}"
+             + "}}"
+  match gen.generate(schema) {
+    Err(e) => fail(str.concat("parse: ", e)),
+    Ok(src) => assert_contains(src, "fn legacy_schema()", "definitions keyword"),
+  }
+}
+
+fn test_oneof_discriminated() -> Result[Unit, Str] {
+  let schema := "{\"title\":\"Event\","
+             + "\"oneOf\":[{"
+             +   "\"type\":\"object\","
+             +   "\"required\":[\"kind\",\"user_id\"],"
+             +   "\"properties\":{"
+             +     "\"kind\":{\"const\":\"signup\"},"
+             +     "\"user_id\":{\"type\":\"string\"}"
+             +   "}"
+             + "},{"
+             +   "\"type\":\"object\","
+             +   "\"required\":[\"kind\",\"amount\"],"
+             +   "\"properties\":{"
+             +     "\"kind\":{\"const\":\"purchase\"},"
+             +     "\"amount\":{\"type\":\"integer\"}"
+             +   "}"
+             + "}]}"
+  match gen.generate(schema) {
+    Err(e) => fail(str.concat("parse: ", e)),
+    Ok(src) =>
+      match assert_contains(src, "fn event_signup_schema()", "signup branch") {
+        Err(why) => Err(why),
+        Ok(_)    =>
+          match assert_contains(src, "fn event_purchase_schema()", "purchase branch") {
+            Err(why) => Err(why),
+            Ok(_)    => assert_contains(src, "union.discriminate", "dispatcher"),
+          },
+      },
+  }
+}
+
 # ---- Suite + runner ---------------------------------------------
 
 fn suite() -> List[Result[Unit, Str]] {
@@ -160,6 +330,16 @@ fn suite() -> List[Result[Unit, Str]] {
     test_int_non_negative(),
     test_primitive_array(),
     test_invalid_json(),
+    # v0.3 extensions (#1)
+    test_pattern_constraint(),
+    test_format_email(),
+    test_format_uri(),
+    test_format_uuid(),
+    test_format_unknown_dropped(),
+    test_ref_resolution(),
+    test_ref_in_array_items(),
+    test_definitions_keyword(),
+    test_oneof_discriminated(),
   ]
 }
 

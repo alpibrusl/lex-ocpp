@@ -1,0 +1,33 @@
+{
+  "title": "AuthorizeRequest",
+  "description": "OCPP 2.0.1 — Authorize.req",
+  "type": "object",
+  "$defs": {
+    "IdTokenType": {
+      "type": "object",
+      "required": ["idToken", "type"],
+      "properties": {
+        "idToken": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36
+        },
+        "type": {
+          "type": "string",
+          "enum": ["Central", "eMAID", "ISO14443", "ISO15693",
+                   "KeyCode", "Local", "MacAddress", "NoAuthorization"]
+        }
+      }
+    }
+  },
+  "required": ["idToken"],
+  "properties": {
+    "idToken": {
+      "$ref": "#/$defs/IdTokenType"
+    },
+    "certificate": {
+      "type": "string",
+      "maxLength": 5500
+    }
+  }
+}
