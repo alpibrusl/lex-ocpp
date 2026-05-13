@@ -405,6 +405,243 @@ fn validate_change_availability_req(j :: jv.Json) -> Result[jv.Json, List[e.Erro
   s.validate(change_availability_req_schema(), j)
 }
 
+# ---- ClearCache.req ---------------------------------------------
+
+fn clear_cache_req_schema() -> s.ModelSchema {
+  { title: "ClearCacheRequest",
+    description: "OCPP 2.0.1 — ClearCache.req",
+    fields: [] }
+}
+
+fn validate_clear_cache_req(j :: jv.Json) -> Result[jv.Json, List[e.Error]] {
+  s.validate(clear_cache_req_schema(), j)
+}
+
+# ---- CancelReservation.req --------------------------------------
+
+fn cancel_reservation_req_schema() -> s.ModelSchema {
+  {
+    title: "CancelReservationRequest",
+    description: "OCPP 2.0.1 — CancelReservation.req",
+    fields: [
+      s.required_int("reservationId", []),
+    ],
+  }
+}
+
+fn validate_cancel_reservation_req(j :: jv.Json) -> Result[jv.Json, List[e.Error]] {
+  s.validate(cancel_reservation_req_schema(), j)
+}
+
+# ---- GetVariables.req -------------------------------------------
+#
+# Spec: `getVariableData` is a non-empty list of GetVariableData
+# records, each carrying a Component + Variable reference. Use the
+# shared component / variable schemas defined below.
+
+fn component_schema() -> s.ModelSchema {
+  {
+    title: "Component", description: "",
+    fields: [
+      s.required_str("name", [StrNonEmpty, StrMaxLen(50)]),
+      s.optional(s.required_str("instance", [StrMaxLen(50)])),
+      s.optional(s.required_object("evse", evse_schema())),
+    ],
+  }
+}
+
+fn variable_schema() -> s.ModelSchema {
+  {
+    title: "Variable", description: "",
+    fields: [
+      s.required_str("name", [StrNonEmpty, StrMaxLen(50)]),
+      s.optional(s.required_str("instance", [StrMaxLen(50)])),
+    ],
+  }
+}
+
+fn get_variable_data_schema() -> s.ModelSchema {
+  {
+    title: "GetVariableData", description: "",
+    fields: [
+      s.optional(s.required_str("attributeType",
+        [StrOneOf(["Actual", "Target", "MinSet", "MaxSet"])])),
+      s.required_object("component", component_schema()),
+      s.required_object("variable",  variable_schema()),
+    ],
+  }
+}
+
+fn get_variables_req_schema() -> s.ModelSchema {
+  {
+    title: "GetVariablesRequest",
+    description: "OCPP 2.0.1 — GetVariables.req",
+    fields: [
+      s.required_array("getVariableData",
+        KObject(get_variable_data_schema()), [ListNonEmpty]),
+    ],
+  }
+}
+
+fn validate_get_variables_req(j :: jv.Json) -> Result[jv.Json, List[e.Error]] {
+  s.validate(get_variables_req_schema(), j)
+}
+
+# ---- SetVariables.req -------------------------------------------
+
+fn set_variable_data_schema() -> s.ModelSchema {
+  {
+    title: "SetVariableData", description: "",
+    fields: [
+      s.optional(s.required_str("attributeType",
+        [StrOneOf(["Actual", "Target", "MinSet", "MaxSet"])])),
+      s.required_str("attributeValue", [StrMaxLen(1000)]),
+      s.required_object("component", component_schema()),
+      s.required_object("variable",  variable_schema()),
+    ],
+  }
+}
+
+fn set_variables_req_schema() -> s.ModelSchema {
+  {
+    title: "SetVariablesRequest",
+    description: "OCPP 2.0.1 — SetVariables.req",
+    fields: [
+      s.required_array("setVariableData",
+        KObject(set_variable_data_schema()), [ListNonEmpty]),
+    ],
+  }
+}
+
+fn validate_set_variables_req(j :: jv.Json) -> Result[jv.Json, List[e.Error]] {
+  s.validate(set_variables_req_schema(), j)
+}
+
+# ---- GetBaseReport.req ------------------------------------------
+
+fn get_base_report_req_schema() -> s.ModelSchema {
+  {
+    title: "GetBaseReportRequest",
+    description: "OCPP 2.0.1 — GetBaseReport.req",
+    fields: [
+      s.required_int("requestId", []),
+      s.required_str("reportBase",
+        [StrOneOf(["ConfigurationInventory", "FullInventory", "SummaryInventory"])]),
+    ],
+  }
+}
+
+fn validate_get_base_report_req(j :: jv.Json) -> Result[jv.Json, List[e.Error]] {
+  s.validate(get_base_report_req_schema(), j)
+}
+
+# ---- NotifyEvent.req --------------------------------------------
+
+fn event_data_schema() -> s.ModelSchema {
+  {
+    title: "EventData", description: "",
+    fields: [
+      s.required_int("eventId",          []),
+      s.required_str("timestamp",        [StrNonEmpty]),
+      s.required_str("trigger",
+        [StrOneOf(["Alerting", "Delta", "Periodic"])]),
+      s.required_str("actualValue",      [StrMaxLen(2500)]),
+      s.required_str("eventNotificationType",
+        [StrOneOf(["HardWiredNotification", "HardWiredMonitor",
+                   "PreconfiguredMonitor", "CustomMonitor"])]),
+      s.required_object("component",     component_schema()),
+      s.required_object("variable",      variable_schema()),
+    ],
+  }
+}
+
+fn notify_event_req_schema() -> s.ModelSchema {
+  {
+    title: "NotifyEventRequest",
+    description: "OCPP 2.0.1 — NotifyEvent.req",
+    fields: [
+      s.required_str("generatedAt", [StrNonEmpty]),
+      s.required_int("seqNo",       [IntNonNegative]),
+      s.required_array("eventData", KObject(event_data_schema()), [ListNonEmpty]),
+      s.optional(s.required_bool("tbc")),
+    ],
+  }
+}
+
+fn validate_notify_event_req(j :: jv.Json) -> Result[jv.Json, List[e.Error]] {
+  s.validate(notify_event_req_schema(), j)
+}
+
+# ---- LogStatusNotification.req ----------------------------------
+
+fn log_status_notification_req_schema() -> s.ModelSchema {
+  {
+    title: "LogStatusNotificationRequest",
+    description: "OCPP 2.0.1 — LogStatusNotification.req",
+    fields: [
+      s.required_str("status",
+        [StrOneOf(["BadMessage", "Idle", "NotSupportedOperation",
+                   "PermissionDenied", "Uploaded", "UploadFailure",
+                   "Uploading", "AcceptedCanceled"])]),
+      s.optional(s.required_int("requestId", [])),
+    ],
+  }
+}
+
+fn validate_log_status_notification_req(j :: jv.Json) -> Result[jv.Json, List[e.Error]] {
+  s.validate(log_status_notification_req_schema(), j)
+}
+
+# ---- SignCertificate.req ----------------------------------------
+
+fn sign_certificate_req_schema() -> s.ModelSchema {
+  {
+    title: "SignCertificateRequest",
+    description: "OCPP 2.0.1 — SignCertificate.req",
+    fields: [
+      s.required_str("csr", [StrNonEmpty, StrMaxLen(5500)]),
+      s.optional(s.required_str("certificateType",
+        [StrOneOf(["ChargingStationCertificate", "V2GCertificate"])])),
+    ],
+  }
+}
+
+fn validate_sign_certificate_req(j :: jv.Json) -> Result[jv.Json, List[e.Error]] {
+  s.validate(sign_certificate_req_schema(), j)
+}
+
+# ---- UpdateFirmware.req -----------------------------------------
+
+fn firmware_type_schema() -> s.ModelSchema {
+  {
+    title: "Firmware", description: "",
+    fields: [
+      s.required_str("location",          [StrNonEmpty, StrMaxLen(512)]),
+      s.required_str("retrieveDateTime",  [StrNonEmpty]),
+      s.optional(s.required_str("installDateTime", [StrNonEmpty])),
+      s.optional(s.required_str("signingCertificate", [StrMaxLen(5500)])),
+      s.optional(s.required_str("signature",          [StrMaxLen(800)])),
+    ],
+  }
+}
+
+fn update_firmware_req_schema() -> s.ModelSchema {
+  {
+    title: "UpdateFirmwareRequest",
+    description: "OCPP 2.0.1 — UpdateFirmware.req",
+    fields: [
+      s.optional(s.required_int("retries",      [IntNonNegative])),
+      s.optional(s.required_int("retryInterval",[IntNonNegative])),
+      s.required_int("requestId",               []),
+      s.required_object("firmware",             firmware_type_schema()),
+    ],
+  }
+}
+
+fn validate_update_firmware_req(j :: jv.Json) -> Result[jv.Json, List[e.Error]] {
+  s.validate(update_firmware_req_schema(), j)
+}
+
 # ============================================================
 # Bulk lookup
 # ============================================================
@@ -430,6 +667,15 @@ fn all_request_validators() -> List[ActionValidator] {
     { action: "RequestStopTransaction",        validator: validate_request_stop_transaction_req },
     { action: "TriggerMessage",                validator: validate_trigger_message_req },
     { action: "ChangeAvailability",            validator: validate_change_availability_req },
+    { action: "ClearCache",                    validator: validate_clear_cache_req },
+    { action: "CancelReservation",             validator: validate_cancel_reservation_req },
+    { action: "GetVariables",                  validator: validate_get_variables_req },
+    { action: "SetVariables",                  validator: validate_set_variables_req },
+    { action: "GetBaseReport",                 validator: validate_get_base_report_req },
+    { action: "NotifyEvent",                   validator: validate_notify_event_req },
+    { action: "LogStatusNotification",         validator: validate_log_status_notification_req },
+    { action: "SignCertificate",               validator: validate_sign_certificate_req },
+    { action: "UpdateFirmware",                validator: validate_update_firmware_req },
   ]
 }
 

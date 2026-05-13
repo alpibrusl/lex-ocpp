@@ -15,19 +15,23 @@ transport. Requires **lex-lang 0.9.1+** for native WebSocket support
 
 ## Build status
 
-Every file in `src/`, `tests/`, and `examples/` passes `lex check`, and
-every test suite returns 0 failures, against a tip-of-tree
-`lex` binary built from this repo's stable lex-lang sibling:
+Every file under `src/`, `tests/`, `examples/`, and `tools/` passes
+`lex check`, and every test suite returns 0 failures, against a
+tip-of-tree `lex` binary built from this repo's stable lex-lang
+sibling:
 
 ```
-src/messages.lex      ok
-src/error.lex         ok
-src/route.lex         ok
-src/charge_point.lex  ok
-src/v16/*.lex         ok
-src/v201/*.lex        ok
-tests/*.lex           ok  → 0 failures across 5 suites (~55 cases)
-examples/*.lex        ok
+src/messages.lex          ok
+src/error.lex             ok
+src/route.lex             ok
+src/route_io.lex          ok
+src/charge_point.lex      ok
+src/charge_point_io.lex   ok
+src/v16/*.lex             ok
+src/v201/*.lex            ok
+tools/gen.lex             ok
+tests/*.lex               ok  → 0 failures across 7 suites (~91 cases)
+examples/*.lex            ok
 ```
 
 **One upstream blocker for downstream consumers:**
@@ -74,8 +78,17 @@ lex-schema with **zero workarounds in source.**
   FirmwareStatusNotification, SecurityEventNotification, Reset,
   RequestStartTransaction, RequestStopTransaction, TriggerMessage,
   ChangeAvailability).
-- **Three runnable examples**: a complete v1.6 CSMS, a v2.0.1 CSMS,
-  and a frame-construction demo for the charger side.
+- **Four runnable examples**: a complete v1.6 CSMS, a v2.0.1 CSMS,
+  an in-process stateful CSMS with effectful handlers, and a
+  frame-construction demo for the charger side.
+- **JSON Schema → Lex codegen** (`tools/gen.lex`). Reads a JSON
+  Schema document and emits a matching `ModelSchema` + validator
+  wrapper. Demonstrates the pattern for bulk-generating the
+  remaining v2.0.1 surface from the OCA's published schemas.
+- **Two dispatch paths**: a pure `route.dispatch` for tests and
+  deterministic replay, and an effectful `route_io.dispatch` with
+  upper bound `[io, time, sql]` so handlers can log, timestamp,
+  and persist via lex-orm.
 
 ## Quickstart
 
@@ -136,25 +149,32 @@ lex.toml                  package manifest (lex 0.9.1+)
 src/
   messages.lex            Call / CallResult / CallError framing
   error.lex               OCPP error codes + OcppError ADT
-  route.lex               Handler registry + dispatch
-  charge_point.lex        mobilityhouse-style ChargePoint façade
+  route.lex               Pure handler registry + dispatch
+  route_io.lex            Effectful registry + dispatch ([io, time, sql])
+  charge_point.lex        mobilityhouse-style ChargePoint façade (pure)
+  charge_point_io.lex     Effectful ChargePoint façade
   v16/
     action.lex            All 29 OCPP 1.6 action names
     enums.lex             AuthorizationStatus, ChargePointStatus, …
     datatypes.lex         IdTagInfo, MeterValue, ChargingProfile, …
-    schemas.lex           lex-schema validators per action
+    schemas.lex           lex-schema validators per action (19)
   v201/
     action.lex            All 64 OCPP 2.0.1 action names
     enums.lex             BootReason, IdTokenType, TransactionEvent, …
-    schemas.lex           lex-schema validators for the core surface
+    schemas.lex           lex-schema validators (22 actions)
+tools/
+  gen.lex                 JSON Schema → lex-schema codegen
 tests/
   test_messages.lex
   test_error.lex
   test_route.lex
+  test_route_io.lex       (v0.2) effectful dispatch
   test_v16_schemas.lex
   test_v201_schemas.lex
+  test_gen.lex            (v0.2) codegen tool
 examples/
-  csms_v16.lex            Full v1.6 CSMS over WebSocket
+  csms_v16.lex            Full v1.6 CSMS over WebSocket (pure handlers)
+  csms_v16_stateful.lex   (v0.2) in-process CSMS with [io] handlers
   csms_v201.lex           v2.0.1 CSMS over WebSocket
   charger_frames.lex      Frame construction demo (no transport)
 ```
@@ -261,18 +281,23 @@ ports / subprotocols.
   - [lex-lang: WebSocket client (`net.dial_ws`)](https://github.com/alpibrusl/lex-lang/issues)
     (an issue we filed against lex-lang)
 
-- **Stateful handlers.** Handlers in v0.1 are pure
-  `(jv.Json) -> HandlerResult`. To persist state (transactions,
-  authorization caches, charging profiles), wrap the dispatch in
-  an effectful adapter that owns the state — lex-orm's `[sql]`
-  effect composes naturally. A future `route.handler_io` /
-  `dispatch_io` pair is on the roadmap.
+- ~~**Stateful handlers.**~~ ✅ shipped in v0.2 — see
+  `src/route_io.lex` and `src/charge_point_io.lex`. Effectful
+  handlers carry an upper bound of `[io, time, sql]` so they can
+  log via `io.print`, stamp responses with timestamps, and persist
+  via lex-orm's `[sql]`-flavored `q.run_*`. Pure handlers fit too —
+  `[io, time, sql]` is an upper bound, not a requirement.
+  `examples/csms_v16_stateful.lex` walks the pattern end-to-end.
 
-- **Code generation from official JSON Schemas.** The OCPP working
-  group ships JSON Schema drafts for every action. A `tools/`
-  generator that reads them and emits Lex validators would make
-  the v201 schema surface trivial to expand to all 64 actions.
-  Tracked as a follow-up issue.
+- ~~**Code generation from official JSON Schemas.**~~ ✅ scaffolded
+  in v0.2 — see `tools/gen.lex`. Reads a JSON Schema (top-level
+  `type: object` with `properties` / `required` / `enum` /
+  `minLength` / `maxLength` / `minimum` / `maximum` / `minItems`) and
+  emits a matching `s.ModelSchema` value + `validate_<action>`
+  wrapper. Coverage of more advanced JSON Schema constructs
+  (`$ref`, `oneOf` / `anyOf`, `pattern`, format hints) is open
+  follow-up. Eight tests pin the generator's output in
+  `tests/test_gen.lex`.
 
 - **Security profiles 1-3.** TLS + Basic Auth, TLS + Mutual Auth,
   certificate provisioning. The frame-level work is in place
@@ -281,39 +306,52 @@ ports / subprotocols.
 
 ## Effect system
 
-Every module under `src/` is pure (no declared effects). The
-transport adapter declares them:
+The pure path is fully effect-free; the effectful path declares a
+fixed upper bound:
 
-| Function                      | Effects |
-|-------------------------------|---------|
-| `messages.parse` / `encode`   | none |
-| `route.dispatch`              | none |
-| `route.handle_raw`            | none |
-| `charge_point.handle_raw`     | none |
-| `examples/csms_v16.main`      | `[net, io, time]` |
-| handler bodies                | none (pure handlers) |
+| Function                            | Effects |
+|-------------------------------------|---------|
+| `messages.parse` / `encode`         | none |
+| `route.dispatch` / `handle_raw`     | none |
+| `charge_point.handle_raw`           | none |
+| `route_io.dispatch` / `handle_raw`  | `[io, time, sql]` |
+| `charge_point_io.handle_raw`        | `[io, time, sql]` |
+| `tools/gen.generate`                | none |
+| `examples/csms_v16.main`            | `[net, io, time]` |
+| `examples/csms_v16_stateful.main`   | `[io, time, sql]` |
+| handler bodies (pure registry)      | none |
+| handler bodies (IO registry)        | ⊆ `[io, time, sql]` (upper bound) |
 
-Test suites run effect-free; `lex check src/` and `lex check tests/`
-both pass without any `--allow-effects` flag.
+The pure `src/` modules + pure tests run without any
+`--allow-effects` flag. The effectful test suite (`test_route_io.lex`)
+runs with `--allow-effects io,sql,time`.
 
 ## Tests
 
 ```bash
 for f in tests/test_*.lex; do
   echo -n "$(basename $f): "
-  lex run "$f" run_all
+  if [[ "$f" == *"_io"* ]]; then
+    lex run --allow-effects io,sql,time "$f" run_all
+  else
+    lex run "$f" run_all
+  fi
 done
-# test_messages.lex:      0
 # test_error.lex:         0
+# test_gen.lex:           0
+# test_messages.lex:      0
 # test_route.lex:         0
+# test_route_io.lex:      0
 # test_v16_schemas.lex:   0
 # test_v201_schemas.lex:  0
 ```
 
-(Reference output: every line ends in `0`, meaning no failing cases.)
+(Reference output: every line ends in `0`, meaning no failing cases —
+seven suites, ~91 cases.)
 
 Each suite exports `run_all() -> Int` returning the count of failing
-cases.
+cases. Pure suites need no effect grants; the effectful suite
+(`test_route_io.lex`) runs handlers under `[io, time, sql]`.
 
 ## Running the examples
 
