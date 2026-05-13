@@ -118,10 +118,10 @@ fn authorization_data(id_tag :: Str) -> AuthorizationData {
 }
 
 fn authorization_data_with(
-  id_tag      :: Str,
-  id_tag_info :: IdTagInfo
+  id_tag :: Str,
+  info   :: IdTagInfo
 ) -> AuthorizationData {
-  { id_tag: id_tag, id_tag_info: Some(id_tag_info) }
+  { id_tag: id_tag, id_tag_info: Some(info) }
 }
 
 fn authorization_data_to_json(a :: AuthorizationData) -> jv.Json {
@@ -192,13 +192,13 @@ type ChargingSchedule = {
 }
 
 fn charging_schedule(
-  charging_rate_unit       :: Str,
-  charging_schedule_period :: List[ChargingSchedulePeriod]
+  charging_rate_unit :: Str,
+  periods            :: List[ChargingSchedulePeriod]
 ) -> ChargingSchedule {
   {
     duration: None, start_schedule: None,
     charging_rate_unit: charging_rate_unit,
-    charging_schedule_period: charging_schedule_period,
+    charging_schedule_period: periods,
     min_charging_rate: None,
   }
 }
@@ -245,7 +245,7 @@ fn charging_profile(
   stack_level              :: Int,
   charging_profile_purpose :: Str,
   charging_profile_kind    :: Str,
-  charging_schedule        :: ChargingSchedule
+  schedule                 :: ChargingSchedule
 ) -> ChargingProfile {
   {
     charging_profile_id: charging_profile_id,
@@ -256,7 +256,7 @@ fn charging_profile(
     recurrency_kind: None,
     valid_from: None,
     valid_to: None,
-    charging_schedule: charging_schedule,
+    charging_schedule: schedule,
   }
 }
 

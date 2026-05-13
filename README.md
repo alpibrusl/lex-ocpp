@@ -11,46 +11,36 @@ Lex's effect system, variant ADTs, and pure-core / effect-edge split.
 
 Built on top of [lex-schema](https://github.com/alpibrusl/lex-schema) for
 payload validation, and designed to pair cleanly with
-[lex-web](https://github.com/alpibrusl/lex-web)'s `ws.serve` for the WebSocket
-transport. Requires **lex-lang 0.9.1+** for native WebSocket support
-(`net.serve_ws_fn`).
+[lex-web](https://github.com/alpibrusl/lex-web)'s `ws.serve` for the
+WebSocket transport. Requires **lex-lang 0.9.2+** (cross-package
+`examples { }` name resolution + pre-built CI binaries, both landed in
+the 0.9.2 release).
 
 ## Build status
 
-Every file under `src/`, `tests/`, `examples/`, and `tools/` passes
-`lex check`, and every test suite returns 0 failures, against a
-tip-of-tree `lex` binary built from this repo's stable lex-lang
-sibling:
+`lex ci --no-fmt` passes against vanilla `lex 0.9.2` + the published
+`lex-schema` with **zero workarounds in source.** Every file under
+`src/`, `tests/`, `examples/`, and `tools/` passes `lex check --strict`,
+and every test suite returns 0 failures:
 
 ```
-src/messages.lex          ok
-src/error.lex             ok
-src/route.lex             ok
-src/route_io.lex          ok
-src/charge_point.lex      ok
-src/charge_point_io.lex   ok
-src/v16/*.lex             ok
-src/v201/*.lex            ok
-src/v21/*.lex             ok
-tools/gen.lex             ok
-tests/*.lex               ok  → 0 failures across 8 suites (~122 cases)
-examples/*.lex            ok
+src/*.lex             ok    (lex check --strict)
+src/v16/*.lex         ok
+src/v201/*.lex        ok
+src/v21/*.lex         ok
+tools/gen.lex         ok
+tests/test_*.lex      ok    (lex test, 7 suites)
+tests/effectful/*.lex 0     (lex run --allow-effects io,sql,time)
+examples/*.lex        ok
 ```
 
-**One upstream blocker for downstream consumers:**
-[`lex-lang#391`](https://github.com/alpibrusl/lex-lang/issues/391) — a name
-resolution bug in `examples { }` blocks fires when `lex-schema/src/schema.lex`
-is imported across package boundaries. Three of lex-schema's `examples`
-blocks reference local top-level fns that fail to resolve at import time;
-all three transitively break any downstream that does
-`import "lex-schema/schema" as s`. Verified by running the lex-ocpp test
-suite against a locally-patched lex-schema (examples block on line 99
-commented out). Both lex-orm's `tests/test_query.lex` and lex-ocpp hit
-the same root cause.
-
-Once that lands (either upstream fix in lex-lang, or stopgap in lex-schema),
-lex-ocpp compiles cleanly against vanilla `lex 0.9.1` + the published
-lex-schema with **zero workarounds in source.**
+**One remaining upstream knob**:
+[`lex-lang#399`](https://github.com/alpibrusl/lex-lang/issues/399) —
+`Policy::permissive()` is missing `sql`, so `lex test` can't run the
+effectful suite. Sitting in `tests/effectful/` keeps it skipped by the
+non-recursive runner; CI runs it via `lex run --allow-effects
+io,sql,time` as a separate step. Folds back into `lex ci` once #399
+lands.
 
 ## What it ships
 
@@ -346,47 +336,27 @@ GitHub Actions runs the full pipeline on every push to `main` and
 on every pull request — see `.github/workflows/lex.yml`. Locally:
 
 ```bash
-# per-file type-check sweep
-for f in $(find src tests examples tools -name '*.lex'); do
-  lex check "$f" >/dev/null || echo "FAIL: $f"
-done
+lex ci --no-fmt
+# ==> lex pkg install
+# ==> lex check --strict src/    ok across all files
+# ==> lex test                   7 passed, 0 failed
+# CI passed — all steps green
 
-# per-suite test run (lex test only resolves single-file imports,
-# so multi-file test runs go through `lex run` instead)
-for f in tests/test_*.lex; do
-  echo -n "$(basename $f): "
-  if [[ "$f" == *"_io"* ]]; then
-    lex run --allow-effects io,sql,time "$f" run_all
-  else
-    lex run "$f" run_all
-  fi
-done
-# test_error.lex:         0
-# test_gen.lex:           0
-# test_messages.lex:      0
-# test_route.lex:         0
-# test_route_io.lex:      0
-# test_v16_schemas.lex:   0
-# test_v201_schemas.lex:  0
-# test_v21_schemas.lex:   0
+# Plus the [sql]-flavoured suite (separately, until lex-lang#399 lands):
+lex run --allow-effects io,sql,time \
+  tests/effectful/test_route_io.lex run_all
+# → 0
 ```
 
-(Reference output: every line ends in `0` — **8 suites, ~122 cases,
-zero failures.**)
+**8 suites, ~122 cases, zero failures.** Pure suites need no effect
+grants; the effectful suite under `tests/effectful/` runs handlers
+under `[io, time, sql]`.
 
-Each suite exports `run_all() -> Int` returning the count of failing
-cases. Pure suites need no effect grants; the effectful suite
-(`test_route_io.lex`) runs handlers under `[io, time, sql]`.
-
-The CI workflow checks out three sibling repos (lex-ocpp, lex-schema,
-lex-web) into a flat layout so the `path = "../<sibling>"` deps in
-`lex.toml` resolve cleanly, applies the
-[lex-schema#5](https://github.com/alpibrusl/lex-schema/issues/5)
-stopgap (drop one `examples { }` block), builds the lex toolchain,
-then runs the same per-file / per-suite loop above. The stopgap step
-goes away once lex-schema#5 (or its root cause
-[lex-lang#391](https://github.com/alpibrusl/lex-lang/issues/391))
-lands.
+The CI workflow checks out lex-ocpp + lex-schema + lex-web siblings
+into a flat layout (so the `path = "../<sibling>"` deps in `lex.toml`
+resolve cleanly), installs the **pre-built `lex 0.9.2` release binary**
+(no Rust toolchain needed on the runner — 30s instead of 90s), runs
+`lex ci --no-fmt`, then the effectful suite as a follow-up step.
 
 ## Running the examples
 

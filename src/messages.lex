@@ -281,7 +281,7 @@ fn parse_call_error_typed(
 
 # ---- Convenience extractors --------------------------------------
 
-fn message_id(frame :: Frame) -> Str {
+fn message_id_of(frame :: Frame) -> Str {
   match frame {
     FrameCall(c)        => c.message_id,
     FrameCallResult(r)  => r.message_id,
