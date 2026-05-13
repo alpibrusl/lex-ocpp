@@ -13,6 +13,38 @@ payload validation, and designed to pair cleanly with
 transport. Requires **lex-lang 0.9.1+** for native WebSocket support
 (`net.serve_ws_fn`).
 
+## Build status
+
+Every file in `src/`, `tests/`, and `examples/` passes `lex check`, and
+every test suite returns 0 failures, against a tip-of-tree
+`lex` binary built from this repo's stable lex-lang sibling:
+
+```
+src/messages.lex      ok
+src/error.lex         ok
+src/route.lex         ok
+src/charge_point.lex  ok
+src/v16/*.lex         ok
+src/v201/*.lex        ok
+tests/*.lex           ok  → 0 failures across 5 suites (~55 cases)
+examples/*.lex        ok
+```
+
+**One upstream blocker for downstream consumers:**
+[`lex-lang#391`](https://github.com/alpibrusl/lex-lang/issues/391) — a name
+resolution bug in `examples { }` blocks fires when `lex-schema/src/schema.lex`
+is imported across package boundaries. Three of lex-schema's `examples`
+blocks reference local top-level fns that fail to resolve at import time;
+all three transitively break any downstream that does
+`import "lex-schema/schema" as s`. Verified by running the lex-ocpp test
+suite against a locally-patched lex-schema (examples block on line 99
+commented out). Both lex-orm's `tests/test_query.lex` and lex-ocpp hit
+the same root cause.
+
+Once that lands (either upstream fix in lex-lang, or stopgap in lex-schema),
+lex-ocpp compiles cleanly against vanilla `lex 0.9.1` + the published
+lex-schema with **zero workarounds in source.**
+
 ## What it ships
 
 - **Wire framing** (`src/messages.lex`). Parse and encode OCPP-J

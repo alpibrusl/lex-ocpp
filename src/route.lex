@@ -54,13 +54,13 @@ type Fallback = (Str, jv.Json) -> HandlerResult
 
 type RouteEntry = {
   action    :: Str,
-  validator :: Option[Validator],
-  handler   :: Handler,
+  validator :: Option[(jv.Json) -> Result[jv.Json, List[e.Error]]],
+  handler   :: (jv.Json) -> HandlerResult,
 }
 
 type Registry = {
   routes     :: List[RouteEntry],
-  on_unknown :: Fallback,
+  on_unknown :: (Str, jv.Json) -> HandlerResult,
 }
 
 # ---- Registry construction ---------------------------------------
