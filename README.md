@@ -4,8 +4,8 @@ OCPP (Open Charge Point Protocol) library for the
 [Lex language](https://github.com/alpibrusl/lex-lang), in the spirit of
 [mobilityhouse/ocpp](https://github.com/mobilityhouse/ocpp): the same
 shape — Call / CallResult / CallError framing, separate action catalogs
-for OCPP 1.6 and 2.0.1, handler-registry dispatch — reworked for Lex's
-effect system, variant ADTs, and pure-core / effect-edge split.
+for OCPP 1.6, 2.0.1, and 2.1, handler-registry dispatch — reworked for
+Lex's effect system, variant ADTs, and pure-core / effect-edge split.
 
 Built on top of [lex-schema](https://github.com/alpibrusl/lex-schema) for
 payload validation, and designed to pair cleanly with
@@ -29,8 +29,9 @@ src/charge_point.lex      ok
 src/charge_point_io.lex   ok
 src/v16/*.lex             ok
 src/v201/*.lex            ok
+src/v21/*.lex             ok
 tools/gen.lex             ok
-tests/*.lex               ok  → 0 failures across 7 suites (~91 cases)
+tests/*.lex               ok  → 0 failures across 8 suites (~113 cases)
 examples/*.lex            ok
 ```
 
@@ -162,6 +163,11 @@ src/
     action.lex            All 64 OCPP 2.0.1 action names
     enums.lex             BootReason, IdTokenType, TransactionEvent, …
     schemas.lex           lex-schema validators (22 actions)
+  v21/
+    action.lex            All 85+ OCPP 2.1 action names
+    enums.lex             v2.0.1 carry-overs + DER / BatterySwap /
+                          EnergyTransferMode / TariffChange / PES
+    schemas.lex           Validators for 7 carry-overs + 14 v2.1 additions
 tools/
   gen.lex                 JSON Schema → lex-schema codegen
 tests/
@@ -171,11 +177,13 @@ tests/
   test_route_io.lex       (v0.2) effectful dispatch
   test_v16_schemas.lex
   test_v201_schemas.lex
+  test_v21_schemas.lex    (v0.3) OCPP 2.1 validators
   test_gen.lex            (v0.2) codegen tool
 examples/
   csms_v16.lex            Full v1.6 CSMS over WebSocket (pure handlers)
   csms_v16_stateful.lex   (v0.2) in-process CSMS with [io] handlers
   csms_v201.lex           v2.0.1 CSMS over WebSocket
+  csms_v21.lex            (v0.3) v2.1 CSMS — DER / battery swap / streams
   charger_frames.lex      Frame construction demo (no transport)
 ```
 
@@ -246,23 +254,27 @@ PropertyConstraintViolation {
 }
 ```
 
-### One framework, two spec versions
+### One framework, three spec versions
 
-OCPP 1.6 and 2.0.1 share the same wire-level RPC framework (Call /
-CallResult / CallError) but use different action catalogs, different
+OCPP 1.6, 2.0.1, and 2.1 share the same wire-level RPC framework (Call
+/ CallResult / CallError) but use different action catalogs, different
 spellings of a couple of error codes, and (for some actions) different
-payload shapes. lex-ocpp:
+payload shapes. OCPP 2.1 adds ISO 15118-20 bidirectional charging,
+battery swap, periodic event streams, DER (Distributed Energy
+Resources) control, and tariff/settlement flows on top of the 2.0.1
+baseline. lex-ocpp:
 
-- shares `src/messages.lex` and `src/route.lex` between versions,
-- exposes both `src/v16/` and `src/v201/` action / enum / schema
+- shares `src/messages.lex` and `src/route.lex` between all three versions,
+- exposes `src/v16/`, `src/v201/`, and `src/v21/` action / enum / schema
   catalogs,
 - exposes both `OccurenceConstraintViolation` (1.6) and
-  `OccurrenceConstraintViolation` + `FormatViolation` (2.0.1) in
-  `src/error.lex` so handler code reads naturally on either side.
+  `OccurrenceConstraintViolation` + `FormatViolation` (2.0.1 + 2.1) in
+  `src/error.lex` so handler code reads naturally on every side.
 
-To run both versions side-by-side, declare two `ChargePoint` values
-(`cp.new_v16(...)` and `cp.new_v201(...)`) and serve them on different
-ports / subprotocols.
+To run all three side-by-side, declare three `ChargePoint` values
+(`cp.new_v16(...)`, `cp.new_v201(...)`, `cp.new_v21(...)`) and serve them
+on different ports / subprotocols (`"ocpp1.6"`, `"ocpp2.0.1"`,
+`"ocpp2.1"`).
 
 ## What's not in v0.1
 

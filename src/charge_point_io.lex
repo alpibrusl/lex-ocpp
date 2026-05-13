@@ -33,6 +33,7 @@ fn new(id :: Str, version :: Str) -> IOChargePoint {
 
 fn new_v16(id :: Str)  -> IOChargePoint { new(id, cp.version_v16()) }
 fn new_v201(id :: Str) -> IOChargePoint { new(id, cp.version_v201()) }
+fn new_v21(id :: Str)  -> IOChargePoint { new(id, cp.version_v21()) }
 
 # ---- Handler registration ---------------------------------------
 

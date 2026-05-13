@@ -24,6 +24,7 @@ import "./route"    as route
 
 fn version_v16()  -> Str { "ocpp1.6" }
 fn version_v201() -> Str { "ocpp2.0.1" }
+fn version_v21()  -> Str { "ocpp2.1" }
 
 # ---- ChargePoint datatype ----------------------------------------
 
@@ -40,6 +41,7 @@ fn new(id :: Str, version :: Str) -> ChargePoint {
 # Convenience constructors that pre-pick the version.
 fn new_v16(id :: Str)  -> ChargePoint { new(id, version_v16()) }
 fn new_v201(id :: Str) -> ChargePoint { new(id, version_v201()) }
+fn new_v21(id :: Str)  -> ChargePoint { new(id, version_v21()) }
 
 # ---- Handler registration (delegates to route.Registry) ----------
 
