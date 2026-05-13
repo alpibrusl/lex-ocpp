@@ -1,11 +1,13 @@
 # lex-ocpp
 
+[![CI](https://github.com/alpibrusl/lex-ocpp/actions/workflows/lex.yml/badge.svg?branch=main)](https://github.com/alpibrusl/lex-ocpp/actions/workflows/lex.yml)
+
 OCPP (Open Charge Point Protocol) library for the
 [Lex language](https://github.com/alpibrusl/lex-lang), in the spirit of
 [mobilityhouse/ocpp](https://github.com/mobilityhouse/ocpp): the same
 shape — Call / CallResult / CallError framing, separate action catalogs
-for OCPP 1.6 and 2.0.1, handler-registry dispatch — reworked for Lex's
-effect system, variant ADTs, and pure-core / effect-edge split.
+for OCPP 1.6, 2.0.1, and 2.1, handler-registry dispatch — reworked for
+Lex's effect system, variant ADTs, and pure-core / effect-edge split.
 
 Built on top of [lex-schema](https://github.com/alpibrusl/lex-schema) for
 payload validation, and designed to pair cleanly with
@@ -15,19 +17,24 @@ transport. Requires **lex-lang 0.9.1+** for native WebSocket support
 
 ## Build status
 
-Every file in `src/`, `tests/`, and `examples/` passes `lex check`, and
-every test suite returns 0 failures, against a tip-of-tree
-`lex` binary built from this repo's stable lex-lang sibling:
+Every file under `src/`, `tests/`, `examples/`, and `tools/` passes
+`lex check`, and every test suite returns 0 failures, against a
+tip-of-tree `lex` binary built from this repo's stable lex-lang
+sibling:
 
 ```
-src/messages.lex      ok
-src/error.lex         ok
-src/route.lex         ok
-src/charge_point.lex  ok
-src/v16/*.lex         ok
-src/v201/*.lex        ok
-tests/*.lex           ok  → 0 failures across 5 suites (~55 cases)
-examples/*.lex        ok
+src/messages.lex          ok
+src/error.lex             ok
+src/route.lex             ok
+src/route_io.lex          ok
+src/charge_point.lex      ok
+src/charge_point_io.lex   ok
+src/v16/*.lex             ok
+src/v201/*.lex            ok
+src/v21/*.lex             ok
+tools/gen.lex             ok
+tests/*.lex               ok  → 0 failures across 8 suites (~122 cases)
+examples/*.lex            ok
 ```
 
 **One upstream blocker for downstream consumers:**
@@ -74,8 +81,17 @@ lex-schema with **zero workarounds in source.**
   FirmwareStatusNotification, SecurityEventNotification, Reset,
   RequestStartTransaction, RequestStopTransaction, TriggerMessage,
   ChangeAvailability).
-- **Three runnable examples**: a complete v1.6 CSMS, a v2.0.1 CSMS,
-  and a frame-construction demo for the charger side.
+- **Four runnable examples**: a complete v1.6 CSMS, a v2.0.1 CSMS,
+  an in-process stateful CSMS with effectful handlers, and a
+  frame-construction demo for the charger side.
+- **JSON Schema → Lex codegen** (`tools/gen.lex`). Reads a JSON
+  Schema document and emits a matching `ModelSchema` + validator
+  wrapper. Demonstrates the pattern for bulk-generating the
+  remaining v2.0.1 surface from the OCA's published schemas.
+- **Two dispatch paths**: a pure `route.dispatch` for tests and
+  deterministic replay, and an effectful `route_io.dispatch` with
+  upper bound `[io, time, sql]` so handlers can log, timestamp,
+  and persist via lex-orm.
 
 ## Quickstart
 
@@ -136,26 +152,40 @@ lex.toml                  package manifest (lex 0.9.1+)
 src/
   messages.lex            Call / CallResult / CallError framing
   error.lex               OCPP error codes + OcppError ADT
-  route.lex               Handler registry + dispatch
-  charge_point.lex        mobilityhouse-style ChargePoint façade
+  route.lex               Pure handler registry + dispatch
+  route_io.lex            Effectful registry + dispatch ([io, time, sql])
+  charge_point.lex        mobilityhouse-style ChargePoint façade (pure)
+  charge_point_io.lex     Effectful ChargePoint façade
   v16/
     action.lex            All 29 OCPP 1.6 action names
     enums.lex             AuthorizationStatus, ChargePointStatus, …
     datatypes.lex         IdTagInfo, MeterValue, ChargingProfile, …
-    schemas.lex           lex-schema validators per action
+    schemas.lex           lex-schema validators per action (19)
   v201/
     action.lex            All 64 OCPP 2.0.1 action names
     enums.lex             BootReason, IdTokenType, TransactionEvent, …
-    schemas.lex           lex-schema validators for the core surface
+    schemas.lex           lex-schema validators (22 actions)
+  v21/
+    action.lex            All 85+ OCPP 2.1 action names
+    enums.lex             v2.0.1 carry-overs + DER / BatterySwap /
+                          EnergyTransferMode / TariffChange / PES
+    schemas.lex           Validators for 7 carry-overs + 14 v2.1 additions
+tools/
+  gen.lex                 JSON Schema → lex-schema codegen
 tests/
   test_messages.lex
   test_error.lex
   test_route.lex
+  test_route_io.lex       (v0.2) effectful dispatch
   test_v16_schemas.lex
   test_v201_schemas.lex
+  test_v21_schemas.lex    (v0.3) OCPP 2.1 validators
+  test_gen.lex            (v0.2) codegen tool
 examples/
-  csms_v16.lex            Full v1.6 CSMS over WebSocket
+  csms_v16.lex            Full v1.6 CSMS over WebSocket (pure handlers)
+  csms_v16_stateful.lex   (v0.2) in-process CSMS with [io] handlers
   csms_v201.lex           v2.0.1 CSMS over WebSocket
+  csms_v21.lex            (v0.3) v2.1 CSMS — DER / battery swap / streams
   charger_frames.lex      Frame construction demo (no transport)
 ```
 
@@ -226,23 +256,27 @@ PropertyConstraintViolation {
 }
 ```
 
-### One framework, two spec versions
+### One framework, three spec versions
 
-OCPP 1.6 and 2.0.1 share the same wire-level RPC framework (Call /
-CallResult / CallError) but use different action catalogs, different
+OCPP 1.6, 2.0.1, and 2.1 share the same wire-level RPC framework (Call
+/ CallResult / CallError) but use different action catalogs, different
 spellings of a couple of error codes, and (for some actions) different
-payload shapes. lex-ocpp:
+payload shapes. OCPP 2.1 adds ISO 15118-20 bidirectional charging,
+battery swap, periodic event streams, DER (Distributed Energy
+Resources) control, and tariff/settlement flows on top of the 2.0.1
+baseline. lex-ocpp:
 
-- shares `src/messages.lex` and `src/route.lex` between versions,
-- exposes both `src/v16/` and `src/v201/` action / enum / schema
+- shares `src/messages.lex` and `src/route.lex` between all three versions,
+- exposes `src/v16/`, `src/v201/`, and `src/v21/` action / enum / schema
   catalogs,
 - exposes both `OccurenceConstraintViolation` (1.6) and
-  `OccurrenceConstraintViolation` + `FormatViolation` (2.0.1) in
-  `src/error.lex` so handler code reads naturally on either side.
+  `OccurrenceConstraintViolation` + `FormatViolation` (2.0.1 + 2.1) in
+  `src/error.lex` so handler code reads naturally on every side.
 
-To run both versions side-by-side, declare two `ChargePoint` values
-(`cp.new_v16(...)` and `cp.new_v201(...)`) and serve them on different
-ports / subprotocols.
+To run all three side-by-side, declare three `ChargePoint` values
+(`cp.new_v16(...)`, `cp.new_v201(...)`, `cp.new_v21(...)`) and serve them
+on different ports / subprotocols (`"ocpp1.6"`, `"ocpp2.0.1"`,
+`"ocpp2.1"`).
 
 ## What's not in v0.1
 
@@ -261,18 +295,23 @@ ports / subprotocols.
   - [lex-lang: WebSocket client (`net.dial_ws`)](https://github.com/alpibrusl/lex-lang/issues)
     (an issue we filed against lex-lang)
 
-- **Stateful handlers.** Handlers in v0.1 are pure
-  `(jv.Json) -> HandlerResult`. To persist state (transactions,
-  authorization caches, charging profiles), wrap the dispatch in
-  an effectful adapter that owns the state — lex-orm's `[sql]`
-  effect composes naturally. A future `route.handler_io` /
-  `dispatch_io` pair is on the roadmap.
+- ~~**Stateful handlers.**~~ ✅ shipped in v0.2 — see
+  `src/route_io.lex` and `src/charge_point_io.lex`. Effectful
+  handlers carry an upper bound of `[io, time, sql]` so they can
+  log via `io.print`, stamp responses with timestamps, and persist
+  via lex-orm's `[sql]`-flavored `q.run_*`. Pure handlers fit too —
+  `[io, time, sql]` is an upper bound, not a requirement.
+  `examples/csms_v16_stateful.lex` walks the pattern end-to-end.
 
-- **Code generation from official JSON Schemas.** The OCPP working
-  group ships JSON Schema drafts for every action. A `tools/`
-  generator that reads them and emits Lex validators would make
-  the v201 schema surface trivial to expand to all 64 actions.
-  Tracked as a follow-up issue.
+- ~~**Code generation from official JSON Schemas.**~~ ✅ scaffolded
+  in v0.2 — see `tools/gen.lex`. Reads a JSON Schema (top-level
+  `type: object` with `properties` / `required` / `enum` /
+  `minLength` / `maxLength` / `minimum` / `maximum` / `minItems`) and
+  emits a matching `s.ModelSchema` value + `validate_<action>`
+  wrapper. Coverage of more advanced JSON Schema constructs
+  (`$ref`, `oneOf` / `anyOf`, `pattern`, format hints) is open
+  follow-up. Eight tests pin the generator's output in
+  `tests/test_gen.lex`.
 
 - **Security profiles 1-3.** TLS + Basic Auth, TLS + Mutual Auth,
   certificate provisioning. The frame-level work is in place
@@ -281,39 +320,73 @@ ports / subprotocols.
 
 ## Effect system
 
-Every module under `src/` is pure (no declared effects). The
-transport adapter declares them:
+The pure path is fully effect-free; the effectful path declares a
+fixed upper bound:
 
-| Function                      | Effects |
-|-------------------------------|---------|
-| `messages.parse` / `encode`   | none |
-| `route.dispatch`              | none |
-| `route.handle_raw`            | none |
-| `charge_point.handle_raw`     | none |
-| `examples/csms_v16.main`      | `[net, io, time]` |
-| handler bodies                | none (pure handlers) |
+| Function                            | Effects |
+|-------------------------------------|---------|
+| `messages.parse` / `encode`         | none |
+| `route.dispatch` / `handle_raw`     | none |
+| `charge_point.handle_raw`           | none |
+| `route_io.dispatch` / `handle_raw`  | `[io, time, sql]` |
+| `charge_point_io.handle_raw`        | `[io, time, sql]` |
+| `tools/gen.generate`                | none |
+| `examples/csms_v16.main`            | `[net, io, time]` |
+| `examples/csms_v16_stateful.main`   | `[io, time, sql]` |
+| handler bodies (pure registry)      | none |
+| handler bodies (IO registry)        | ⊆ `[io, time, sql]` (upper bound) |
 
-Test suites run effect-free; `lex check src/` and `lex check tests/`
-both pass without any `--allow-effects` flag.
+The pure `src/` modules + pure tests run without any
+`--allow-effects` flag. The effectful test suite (`test_route_io.lex`)
+runs with `--allow-effects io,sql,time`.
 
-## Tests
+## Tests + CI
+
+GitHub Actions runs the full pipeline on every push to `main` and
+on every pull request — see `.github/workflows/lex.yml`. Locally:
 
 ```bash
+# per-file type-check sweep
+for f in $(find src tests examples tools -name '*.lex'); do
+  lex check "$f" >/dev/null || echo "FAIL: $f"
+done
+
+# per-suite test run (lex test only resolves single-file imports,
+# so multi-file test runs go through `lex run` instead)
 for f in tests/test_*.lex; do
   echo -n "$(basename $f): "
-  lex run "$f" run_all
+  if [[ "$f" == *"_io"* ]]; then
+    lex run --allow-effects io,sql,time "$f" run_all
+  else
+    lex run "$f" run_all
+  fi
 done
-# test_messages.lex:      0
 # test_error.lex:         0
+# test_gen.lex:           0
+# test_messages.lex:      0
 # test_route.lex:         0
+# test_route_io.lex:      0
 # test_v16_schemas.lex:   0
 # test_v201_schemas.lex:  0
+# test_v21_schemas.lex:   0
 ```
 
-(Reference output: every line ends in `0`, meaning no failing cases.)
+(Reference output: every line ends in `0` — **8 suites, ~122 cases,
+zero failures.**)
 
 Each suite exports `run_all() -> Int` returning the count of failing
-cases.
+cases. Pure suites need no effect grants; the effectful suite
+(`test_route_io.lex`) runs handlers under `[io, time, sql]`.
+
+The CI workflow checks out three sibling repos (lex-ocpp, lex-schema,
+lex-web) into a flat layout so the `path = "../<sibling>"` deps in
+`lex.toml` resolve cleanly, applies the
+[lex-schema#5](https://github.com/alpibrusl/lex-schema/issues/5)
+stopgap (drop one `examples { }` block), builds the lex toolchain,
+then runs the same per-file / per-suite loop above. The stopgap step
+goes away once lex-schema#5 (or its root cause
+[lex-lang#391](https://github.com/alpibrusl/lex-lang/issues/391))
+lands.
 
 ## Running the examples
 
