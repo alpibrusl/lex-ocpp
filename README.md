@@ -1,5 +1,7 @@
 # lex-ocpp
 
+[![CI](https://github.com/alpibrusl/lex-ocpp/actions/workflows/lex.yml/badge.svg?branch=main)](https://github.com/alpibrusl/lex-ocpp/actions/workflows/lex.yml)
+
 OCPP (Open Charge Point Protocol) library for the
 [Lex language](https://github.com/alpibrusl/lex-lang), in the spirit of
 [mobilityhouse/ocpp](https://github.com/mobilityhouse/ocpp): the same
@@ -31,7 +33,7 @@ src/v16/*.lex             ok
 src/v201/*.lex            ok
 src/v21/*.lex             ok
 tools/gen.lex             ok
-tests/*.lex               ok  → 0 failures across 8 suites (~113 cases)
+tests/*.lex               ok  → 0 failures across 8 suites (~122 cases)
 examples/*.lex            ok
 ```
 
@@ -338,9 +340,19 @@ The pure `src/` modules + pure tests run without any
 `--allow-effects` flag. The effectful test suite (`test_route_io.lex`)
 runs with `--allow-effects io,sql,time`.
 
-## Tests
+## Tests + CI
+
+GitHub Actions runs the full pipeline on every push to `main` and
+on every pull request — see `.github/workflows/lex.yml`. Locally:
 
 ```bash
+# per-file type-check sweep
+for f in $(find src tests examples tools -name '*.lex'); do
+  lex check "$f" >/dev/null || echo "FAIL: $f"
+done
+
+# per-suite test run (lex test only resolves single-file imports,
+# so multi-file test runs go through `lex run` instead)
 for f in tests/test_*.lex; do
   echo -n "$(basename $f): "
   if [[ "$f" == *"_io"* ]]; then
@@ -356,14 +368,25 @@ done
 # test_route_io.lex:      0
 # test_v16_schemas.lex:   0
 # test_v201_schemas.lex:  0
+# test_v21_schemas.lex:   0
 ```
 
-(Reference output: every line ends in `0`, meaning no failing cases —
-seven suites, ~91 cases.)
+(Reference output: every line ends in `0` — **8 suites, ~122 cases,
+zero failures.**)
 
 Each suite exports `run_all() -> Int` returning the count of failing
 cases. Pure suites need no effect grants; the effectful suite
 (`test_route_io.lex`) runs handlers under `[io, time, sql]`.
+
+The CI workflow checks out three sibling repos (lex-ocpp, lex-schema,
+lex-web) into a flat layout so the `path = "../<sibling>"` deps in
+`lex.toml` resolve cleanly, applies the
+[lex-schema#5](https://github.com/alpibrusl/lex-schema/issues/5)
+stopgap (drop one `examples { }` block), builds the lex toolchain,
+then runs the same per-file / per-suite loop above. The stopgap step
+goes away once lex-schema#5 (or its root cause
+[lex-lang#391](https://github.com/alpibrusl/lex-lang/issues/391))
+lands.
 
 ## Running the examples
 
