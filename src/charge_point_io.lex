@@ -89,3 +89,34 @@ fn describe(c :: IOChargePoint) -> Str {
     str.concat(c.id,
       str.concat(", version=", str.concat(c.version, "}"))))
 }
+
+# ---- Outbound connection (charge-point → CSMS) -------------------
+
+# Connect this charge point outbound to a CSMS over WebSocket.
+# `url` is the CSMS endpoint, e.g. "wss://csms.example.com/ocpp/CP001".
+# `on_open` fires once after the handshake — return a WsAction to send
+# the BootNotification frame immediately, or WsNoOp to defer.
+# `on_message` is called for every inbound frame from the CSMS; return
+# a WsAction reply. Use `handle_raw` to route through the registry:
+#
+#   fn on_msg(msg :: WsMessage) -> [io, time, sql] WsAction {
+#     match msg {
+#       WsText(frame) =>
+#         match cp_io.handle_raw(cp, frame) {
+#           Ok(reply) => WsSend(reply),
+#           Err(_)    => WsNoOp,
+#         },
+#       WsClose => WsNoOp,
+#       _       => WsNoOp,
+#     }
+#   }
+#
+# Returns Err(Str) if the connection or TLS handshake fails.
+fn dial[E](
+  c           :: IOChargePoint,
+  url         :: Str,
+  on_open     :: () -> [E] WsAction,
+  on_message  :: (WsMessage) -> [E] WsAction
+) -> [net, E] Result[Unit, Str] {
+  net.dial_ws(url, c.version, on_open, on_message)
+}
