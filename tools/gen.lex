@@ -4,6 +4,26 @@
 # fragment that defines a matching `ModelSchema` value plus a
 # `validate_<action>_req` wrapper.
 #
+# v0.2 coverage (resolves #1):
+#   ✅ top-level `type: object` schemas
+#   ✅ primitives: string, integer, number, boolean
+#   ✅ `required` array → required vs optional
+#   ✅ `enum` arrays on string props → StrOneOf
+#   ✅ `minLength` / `maxLength` → StrMinLen / StrMaxLen
+#   ✅ int `minimum` / `maximum` → IntInRange / IntMin / IntMax
+#   ✅ `minimum: 0` → IntNonNegative
+#   ✅ arrays of primitives → KStr/KInt/KFloat/KBool element kind
+#   ✅ arrays of $ref'd objects → KObject(<ref>_schema())
+#   ✅ string `pattern` → StrPattern
+#   ✅ `format` hints: uri/email/date-time/uuid/ipv4/ipv6/hostname
+#   ✅ `$ref` resolution against `$defs` / `definitions`
+#   ✅ `oneOf` discriminated unions → emits a discriminate dispatcher
+#
+# Deferred (open follow-ups in #1):
+#   ⏭️  `allOf` schema composition
+#   ⏭️  external `$ref`s (across files)
+#   ⏭️  exclusive minimum/maximum, multipleOf
+#
 # Effects: none. Pure Str → Str transformation.
 
 import "std.str"  as str
@@ -61,7 +81,8 @@ fn emit_model_schema_fn(
         str.concat("\",\n    description: \"",
           str.concat(description,
             str.concat("\",\n    fields: [\n",
-              str.concat(fields, "    ],\n  }\n}\n\n"))))))))}
+              str.concat(fields, "    ],\n  }\n}\n\n"))))))))
+}
 
 fn emit_validator_fn(validator_fn :: Str, schema_fn :: Str) -> Str {
   str.concat("fn ", str.concat(validator_fn,
@@ -252,7 +273,7 @@ fn emit_field_inner(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
     Some(ref_name) => str.concat("s.required_object(\"",
       str.concat(name,
         str.concat("\", ",
-          str.concat(snake_case(ref_name), "_schema())"))))
+          str.concat(snake_case(ref_name), "_schema())"))))  ,
     None => {
       let ty := field_str_or(spec, "type", "string")
       match ty {
@@ -266,7 +287,7 @@ fn emit_field_inner(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
             str.concat("\", /* inline nested object — promote to $defs */ ",
               "_nested_schema())"))),
         _ => str.concat("s.required_str(\"",
-               str.concat(name, "\", [])"))
+               str.concat(name, "\", [])"))  ,
       }
     },
   }
@@ -287,7 +308,8 @@ fn emit_int_field(name :: Str, spec :: jv.Json) -> Str {
 }
 
 fn emit_float_field(name :: Str, _spec :: jv.Json) -> Str {
-  str.concat("s.required_float(\"", str.concat(name, "\", []))")}
+  str.concat("s.required_float(\"", str.concat(name, "\", []))"))
+}
 
 fn emit_bool_field(name :: Str) -> Str {
   str.concat("s.required_bool(\"", str.concat(name, "\")"))
@@ -314,7 +336,7 @@ fn emit_array_field(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
     str.concat(name,
       str.concat("\", ",
         str.concat(elem_kind,
-          str.concat(", ", str.concat(shape_checks, ")")))))
+          str.concat(", ", str.concat(shape_checks, ")")))))) 
 }
 
 # ---- $ref resolution ---------------------------------------------
@@ -554,7 +576,7 @@ fn demo() -> Str {
           str.concat(defs_block,
             str.concat("\"required\":[\"idToken\"],",
               str.concat("\"properties\":{",
-                str.concat(root_props, "}}")))))))  
+                str.concat(root_props, "}}"))))))) 
   match generate(sample) {
     Ok(src)  => src,
     Err(e)   => str.concat("ERROR: ", e),
