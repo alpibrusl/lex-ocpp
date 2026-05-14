@@ -16,7 +16,7 @@ jobs:
           path: lex-ocpp
 
       # lex-ocpp's lex.toml resolves lex-schema + lex-web via
-      # `path = "../<sibling>"`. CI runners don't have the siblings
+      # `path = "../↔sibling"". CI runners don't have the siblings
       # pre-cloned, so we check them out next to lex-ocpp.
       - name: Checkout lex-schema (sibling)
         uses: actions/checkout@v4
@@ -60,8 +60,7 @@ jobs:
         working-directory: lex-ocpp
         run: lex check --strict src/charge_point.lex
 
-      # Effectful entry point: covers route_io.lex, charge_point_io.lex,
-      # and security.lex (SP2/SP3 helpers).
+      # Effectful entry point: covers route_io.lex, charge_point_io.lex.
       - name: Type-check charge_point_io.lex (strict)
         working-directory: lex-ocpp
         run: lex check --strict src/charge_point_io.lex
@@ -70,10 +69,62 @@ jobs:
         working-directory: lex-ocpp
         run: lex check --strict src/security.lex
 
-      # Run pure test suite (tests/test_*.lex at top level).
-      - name: Test
+      # Run each test file individually so failures are attributable.
+      - name: Test test_error.lex
         working-directory: lex-ocpp
-        run: lex test
+        run: |
+          out=$(lex run tests/test_error.lex run_all)
+          echo "test_error.lex: $out failure(s)"
+          [ "$out" = "0" ] || { echo "::error::test_error reported $out failure(s)"; exit 1; }
+
+      - name: Test test_messages.lex
+        working-directory: lex-ocpp
+        run: |
+          out=$(lex run tests/test_messages.lex run_all)
+          echo "test_messages.lex: $out failure(s)"
+          [ "$out" = "0" ] || { echo "::error::test_messages reported $out failure(s)"; exit 1; }
+
+      - name: Test test_route.lex
+        working-directory: lex-ocpp
+        run: |
+          out=$(lex run tests/test_route.lex run_all)
+          echo "test_route.lex: $out failure(s)"
+          [ "$out" = "0" ] || { echo "::error::test_route reported $out failure(s)"; exit 1; }
+
+      - name: Test test_gen.lex
+        working-directory: lex-ocpp
+        run: |
+          out=$(lex run tests/test_gen.lex run_all)
+          echo "test_gen.lex: $out failure(s)"
+          [ "$out" = "0" ] || { echo "::error::test_gen reported $out failure(s)"; exit 1; }
+
+      - name: Test test_v16_schemas.lex
+        working-directory: lex-ocpp
+        run: |
+          out=$(lex run tests/test_v16_schemas.lex run_all)
+          echo "test_v16_schemas.lex: $out failure(s)"
+          [ "$out" = "0" ] || { echo "::error::test_v16_schemas reported $out failure(s)"; exit 1; }
+
+      - name: Test test_v201_schemas.lex
+        working-directory: lex-ocpp
+        run: |
+          out=$(lex run tests/test_v201_schemas.lex run_all)
+          echo "test_v201_schemas.lex: $out failure(s)"
+          [ "$out" = "0" ] || { echo "::error::test_v201_schemas reported $out failure(s)"; exit 1; }
+
+      - name: Test test_v21_schemas.lex
+        working-directory: lex-ocpp
+        run: |
+          out=$(lex run tests/test_v21_schemas.lex run_all)
+          echo "test_v21_schemas.lex: $out failure(s)"
+          [ "$out" = "0" ] || { echo "::error::test_v21_schemas reported $out failure(s)"; exit 1; }
+
+      - name: Test test_security.lex
+        working-directory: lex-ocpp
+        run: |
+          out=$(lex run tests/test_security.lex run_all)
+          echo "test_security.lex: $out failure(s)"
+          [ "$out" = "0" ] || { echo "::error::test_security reported $out failure(s)"; exit 1; }
 
       # Effect-flavoured suite in tests/effectful/ -- kept separate
       # because lex test is non-recursive.

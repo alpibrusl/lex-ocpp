@@ -44,7 +44,7 @@ fn test_authenticate_ok() -> Bool {
   match stored {
     Err(_) => false,
     Ok(h)  => match sec.authenticate(h, "pass") {
-      Ok(()) => true,
+      Ok(_)  => true,
       Err(_) => false,
     },
   }
@@ -56,8 +56,8 @@ fn test_authenticate_wrong_pass() -> Bool {
   match stored {
     Err(_) => false,
     Ok(h)  => match sec.authenticate(h, "wrong") {
-      Ok(())  => false,
-      Err(_)  => true,
+      Ok(_)  => false,
+      Err(_) => true,
     },
   }
 }
@@ -79,10 +79,10 @@ fn test_issue_and_decode_cp_token() -> Bool {
 
 fn run_all() -> Int {
   let f := 0
-  let f := if test_password_verify_known_hash()   { f } else { f + 1 }
-  let f := if test_wrong_password_does_not_verify() { f } else { f + 1 }
-  let f := if test_authenticate_ok()              { f } else { f + 1 }
-  let f := if test_authenticate_wrong_pass()      { f } else { f + 1 }
-  let f := if test_issue_and_decode_cp_token()    { f } else { f + 1 }
+  let f := if test_password_verify_known_hash()     { f } else { f + 1 }
+  let f := if test_wrong_password_does_not_verify()  { f } else { f + 1 }
+  let f := if test_authenticate_ok()                 { f } else { f + 1 }
+  let f := if test_authenticate_wrong_pass()         { f } else { f + 1 }
+  let f := if test_issue_and_decode_cp_token()       { f } else { f + 1 }
   f
 }
