@@ -116,7 +116,7 @@ fn test_int_non_negative() -> Result[Unit, Str] {
     str.concat("{\"title\":\"Count\",\"type\":\"object\",",
       str.concat("\"required\":[\"n\"],",
         str.concat("\"properties\":{",
-          "\"n\":{\"type\":\"integer\",\"minimum\":0}}}")))  
+          "\"n\":{\"type\":\"integer\",\"minimum\":0}}}")))
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => assert_contains(src, "IntNonNegative", "non-negative int"),
@@ -130,7 +130,7 @@ fn test_primitive_array() -> Result[Unit, Str] {
         str.concat("\"properties\":{",
           str.concat("\"items\":{\"type\":\"array\",",
             str.concat("\"items\":{\"type\":\"string\",\"maxLength\":40},",
-              "\"minItems\":1}}}")))))
+              "\"minItems\":1}}}")))))  
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) =>
@@ -170,7 +170,7 @@ fn test_format_email() -> Result[Unit, Str] {
     str.concat("{\"title\":\"Contact\",\"type\":\"object\",",
       str.concat("\"required\":[\"email\"],",
         str.concat("\"properties\":{",
-          "\"email\":{\"type\":\"string\",\"format\":\"email\"}}}")))  
+          "\"email\":{\"type\":\"string\",\"format\":\"email\"}}}")))
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => assert_contains(src, "StrEmail", "email format"),
@@ -182,7 +182,7 @@ fn test_format_uri() -> Result[Unit, Str] {
     str.concat("{\"title\":\"Link\",\"type\":\"object\",",
       str.concat("\"required\":[\"href\"],",
         str.concat("\"properties\":{",
-          "\"href\":{\"type\":\"string\",\"format\":\"uri\"}}}")))  
+          "\"href\":{\"type\":\"string\",\"format\":\"uri\"}}}")))
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => assert_contains(src, "StrUrl", "uri format → StrUrl"),
@@ -194,7 +194,7 @@ fn test_format_uuid() -> Result[Unit, Str] {
     str.concat("{\"title\":\"Entity\",\"type\":\"object\",",
       str.concat("\"required\":[\"id\"],",
         str.concat("\"properties\":{",
-          "\"id\":{\"type\":\"string\",\"format\":\"uuid\"}}}")))  
+          "\"id\":{\"type\":\"string\",\"format\":\"uuid\"}}}")))
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => assert_contains(src, "StrUuid", "uuid format"),
@@ -206,7 +206,7 @@ fn test_format_unknown_dropped() -> Result[Unit, Str] {
     str.concat("{\"title\":\"X\",\"type\":\"object\",",
       str.concat("\"required\":[\"v\"],",
         str.concat("\"properties\":{",
-          "\"v\":{\"type\":\"string\",\"format\":\"klingon-glyph\"}}}")))  
+          "\"v\":{\"type\":\"string\",\"format\":\"klingon-glyph\"}}}")))
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => {
@@ -223,7 +223,7 @@ fn test_ref_resolution() -> Result[Unit, Str] {
         str.concat("\"required\":[\"idToken\"],",
           str.concat("\"properties\":{\"idToken\":{\"type\":\"string\"}}}},",
             str.concat("\"required\":[\"idToken\"],",
-              "\"properties\":{\"idToken\":{\"$ref\":\"#/$defs/IdToken\"}}}")))))
+              "\"properties\":{\"idToken\":{\"$ref\":\"#/$defs/IdToken\"}}}")))))  
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) =>
@@ -244,7 +244,7 @@ fn test_ref_in_array_items() -> Result[Unit, Str] {
             str.concat("\"required\":[\"items\"],",
               str.concat("\"properties\":{\"items\":{\"type\":\"array\",",
                 str.concat("\"items\":{\"$ref\":\"#/$defs/Item\"},",
-                  "\"minItems\":1}}}")))))))  
+                  "\"minItems\":1}}}")))))))
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => assert_contains(src, "KObject(item_schema())", "array of $refs"),
@@ -258,7 +258,7 @@ fn test_definitions_keyword() -> Result[Unit, Str] {
         str.concat("\"required\":[\"x\"],",
           str.concat("\"properties\":{\"x\":{\"type\":\"integer\"}}}},",
             str.concat("\"required\":[\"legacy\"],",
-              "\"properties\":{\"legacy\":{\"$ref\":\"#/definitions/Legacy\"}}}")))))
+              "\"properties\":{\"legacy\":{\"$ref\":\"#/definitions/Legacy\"}}}")))))  
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => assert_contains(src, "fn legacy_schema()", "definitions keyword"),
@@ -275,7 +275,7 @@ fn test_oneof_discriminated() -> Result[Unit, Str] {
               str.concat("{\"type\":\"object\",",
                 str.concat("\"required\":[\"kind\",\"amount\"],",
                   str.concat("\"properties\":{\"kind\":{\"const\":\"purchase\"},",
-                    "\"amount\":{\"type\":\"integer\"}}}]}")))))))
+                    "\"amount\":{\"type\":\"integer\"}}}]}")))))))) 
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) =>
