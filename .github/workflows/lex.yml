@@ -7,10 +7,10 @@ on:
 
 env:
   # Pinned at scaffold time. Bump when you upgrade the toolchain.
-  # lex 0.9.2 brings: cross-package examples-block name resolution
-  # (alpibrusl/lex-lang#391), pre-built CI binaries, std.time.now_str,
-  # AEAD / KDF crypto primitives.
-  LEX_VERSION: v0.9.2
+  # lex 0.9.3 brings: net.dial_ws (outbound WS client, wss:// via rustls),
+  # hyper 1.x server (5-8× throughput), permissive-policy fix for sql/random
+  # effects in lex test (#399), list.cons tail-clone elimination.
+  LEX_VERSION: v0.9.3
 
 jobs:
   build:
@@ -61,12 +61,10 @@ jobs:
         working-directory: lex-ocpp
         run: lex ci --no-fmt
 
-      # Effect-flavoured suite — `lex test` runs under
-      # `Policy::permissive()` which is missing `sql`
-      # (alpibrusl/lex-lang#399), so we run the [io, time, sql]
-      # suite via `lex run` with explicit grants. Sitting in
-      # tests/effectful/ keeps `lex test` skipping it (the runner
-      # is non-recursive). Folds back into `lex ci` once #399 lands.
+      # Effect-flavoured suite in tests/effectful/ — kept separate
+      # because lex ci's test runner is non-recursive. Now that #399
+      # is fixed in 0.9.3, could fold into the main suite by moving
+      # tests to tests/ and relying on Policy::permissive().
       - name: Run effectful test suite
         working-directory: lex-ocpp
         run: |
