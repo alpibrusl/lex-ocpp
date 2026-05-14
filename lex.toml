@@ -13,5 +13,4 @@ lex     = "0.9.3"
 #        permissive-policy fix (#399) unblocks lex ci test suite.
 [dependencies]
 lex-schema = { path = "../lex-schema" }
-lex-web    = { path = "../lex-web" }
 lex-crypto = { git = "https://github.com/alpibrusl/lex-crypto" }
