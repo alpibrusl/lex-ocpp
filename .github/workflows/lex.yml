@@ -8,7 +8,7 @@ on:
 env:
   # Pinned at scaffold time. Bump when you upgrade the toolchain.
   # lex 0.9.3 brings: net.dial_ws (outbound WS client, wss:// via rustls),
-  # hyper 1.x server (5-8× throughput), permissive-policy fix for sql/random
+  # hyper 1.x server (5-8x throughput), permissive-policy fix for sql/random
   # effects in lex test (#399), list.cons tail-clone elimination.
   LEX_VERSION: v0.9.3
 
@@ -31,6 +31,17 @@ jobs:
           repository: alpibrusl/lex-schema
           path: lex-schema
 
+      # lex 0.9.3 validates path-dep manifests during pkg install.
+      # lex-schema's main branch doesn't carry a lex.toml yet (PR in
+      # flight); create a minimal one so pkg install succeeds. This step
+      # is a no-op once that PR lands.
+      - name: Bootstrap lex-schema manifest (if missing)
+        run: |
+          if [ ! -f lex-schema/lex.toml ]; then
+            printf '[package]\nname    = "lex-schema"\nversion = "0.1.0"\n\n[dependencies]\n' \
+              > lex-schema/lex.toml
+          fi
+
       - name: Checkout lex-web (sibling)
         uses: actions/checkout@v4
         with:
@@ -51,17 +62,17 @@ jobs:
         run: lex pkg install
 
       # `lex ci` runs:
-      #   pkg install → check --strict src/ → fmt --check src/ tests/
-      #   → test (every tests/test_*.lex; subdirs are ignored)
+      #   pkg install -> check --strict src/ -> fmt --check src/ tests/
+      #   -> test (every tests/test_*.lex; subdirs are ignored)
       #
       # `--no-fmt` until the generated source (tools/gen.lex emits
       # Lex fragments) and the v0.3 hand-written code have been
-      # through `lex fmt` — separate cleanup pass.
+      # through `lex fmt` -- separate cleanup pass.
       - name: lex ci (pkg install + check --strict + test)
         working-directory: lex-ocpp
         run: lex ci --no-fmt
 
-      # Effect-flavoured suite in tests/effectful/ — kept separate
+      # Effect-flavoured suite in tests/effectful/ -- kept separate
       # because lex ci's test runner is non-recursive. Now that #399
       # is fixed in 0.9.3, could fold into the main suite by moving
       # tests to tests/ and relying on Policy::permissive().
