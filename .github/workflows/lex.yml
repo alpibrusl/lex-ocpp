@@ -39,14 +39,10 @@ jobs:
           repository: alpibrusl/lex-web
           path: lex-web
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install Lex toolchain (build from source)
+      - name: Install Lex toolchain
         run: |
-          git clone --depth=1 https://github.com/alpibrusl/lex-lang /tmp/lex-lang
-          cd /tmp/lex-lang && cargo build --release -p lex-cli
-          echo "/tmp/lex-lang/target/release" >> $GITHUB_PATH
+          curl -fsSL https://github.com/alpibrusl/lex-lang/releases/download/v0.9.3/lex-v0.9.3-x86_64-unknown-linux-gnu.tar.gz \
+            | tar -xz -C /usr/local/bin
 
       - name: Verify lex version
         run: lex --version
