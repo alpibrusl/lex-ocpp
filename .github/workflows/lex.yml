@@ -24,10 +24,8 @@ jobs:
           repository: alpibrusl/lex-schema
           path: lex-schema
 
-      # lex 0.9.3 validates path-dep manifests during pkg install.
-      # lex-schema's main branch doesn't carry a lex.toml yet (PR in
-      # flight); create a minimal one so pkg install succeeds. This step
-      # is a no-op once that PR lands.
+      # lex-schema's main branch may not carry a lex.toml yet (PR in
+      # flight); create a minimal one so pkg install succeeds.
       - name: Bootstrap lex-schema manifest (if missing)
         run: |
           if [ ! -f lex-schema/lex.toml ]; then
@@ -50,7 +48,7 @@ jobs:
           cd /tmp/lex-lang && cargo build --release -p lex-cli
           echo "/tmp/lex-lang/target/release" >> $GITHUB_PATH
 
-      - name: Verify lex installation
+      - name: Verify lex version
         run: lex --version
 
       - name: Install package dependencies
@@ -63,15 +61,12 @@ jobs:
         working-directory: lex-ocpp
         run: lex check --strict src/charge_point.lex
 
-      # Effectful entry point: additionally covers route_io.lex and
-      # the new net.dial_ws-based dial[E] function.
+      # Effectful entry point: covers route_io.lex and charge_point_io.lex.
       - name: Type-check charge_point_io.lex (strict)
         working-directory: lex-ocpp
         run: lex check --strict src/charge_point_io.lex
 
       # Run pure test suite (tests/test_*.lex at top level).
-      # 0.9.3 permissive-policy fix (#399) means sql/random effects
-      # work inside lex test without explicit --allow-effects.
       - name: Test
         working-directory: lex-ocpp
         run: lex test
