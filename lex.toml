@@ -9,11 +9,9 @@ lex     = "0.9.3"
 # v1.6 and v2.0.1, handler-registry dispatch), reworked for Lex's
 # effect system, variant ADTs, and pure-core / effect-edge split.
 #
-# Transport-agnostic: src/ has no `[net]` effect. Wire it up to
-# any WebSocket carrier; examples/ uses lex-web.
-#
 # 0.9.3: net.dial_ws enables outbound wss:// charge-point connections;
 #        permissive-policy fix (#399) unblocks lex ci test suite.
 [dependencies]
 lex-schema = { path = "../lex-schema" }
 lex-web    = { path = "../lex-web" }
+lex-crypto = { git = "https://github.com/alpibrusl/lex-crypto" }

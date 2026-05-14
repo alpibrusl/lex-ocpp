@@ -55,16 +55,20 @@ jobs:
         working-directory: lex-ocpp
         run: lex pkg install
 
-      # Pure entry point: covers messages.lex, route.lex, error.lex
-      # and all their transitive imports.
+      # Pure entry point: covers messages.lex, route.lex, error.lex.
       - name: Type-check charge_point.lex (strict)
         working-directory: lex-ocpp
         run: lex check --strict src/charge_point.lex
 
-      # Effectful entry point: covers route_io.lex and charge_point_io.lex.
+      # Effectful entry point: covers route_io.lex, charge_point_io.lex,
+      # and security.lex (SP2/SP3 helpers).
       - name: Type-check charge_point_io.lex (strict)
         working-directory: lex-ocpp
         run: lex check --strict src/charge_point_io.lex
+
+      - name: Type-check security.lex (strict)
+        working-directory: lex-ocpp
+        run: lex check --strict src/security.lex
 
       # Run pure test suite (tests/test_*.lex at top level).
       - name: Test
@@ -81,8 +85,7 @@ jobs:
           echo "test_route_io.lex: $out"
           [ "$out" = "0" ] || { echo "::error::test_route_io reported $out failure(s)"; exit 1; }
 
-      # Belt-and-braces: every file under tools/ and examples/ that
-      # the strict check doesn't reach should still type-check.
+      # Belt-and-braces: every file under tools/ and examples/.
       - name: Type-check tools/ + examples/
         working-directory: lex-ocpp
         run: |
