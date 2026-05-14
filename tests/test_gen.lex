@@ -33,7 +33,7 @@ fn assert_ok_str(r :: Result[Str, Str], label :: Str) -> Result[Str, Str] {
 
 fn test_minimal_object() -> Result[Unit, Str] {
   let schema := str.concat("{\"title\":\"Empty\",\"type\":\"object\",",
-    "\"required\":[],\"properties\":{}}")
+    "\"required\":[],\"properties\":{}}") 
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => {
@@ -55,7 +55,7 @@ fn test_required_and_optional() -> Result[Unit, Str] {
       str.concat("\"required\":[\"email\"],",
         str.concat("\"properties\":{",
           str.concat("\"email\":{\"type\":\"string\"},",
-            "\"nickname\":{\"type\":\"string\"}}}"))))
+            "\"nickname\":{\"type\":\"string\"}}}")))
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) =>
@@ -73,7 +73,7 @@ fn test_enum_constraint() -> Result[Unit, Str] {
       str.concat("\"required\":[\"value\"],",
         str.concat("\"properties\":{",
           str.concat("\"value\":{\"type\":\"string\",",
-            "\"enum\":[\"Accepted\",\"Pending\",\"Rejected\"]}}}")))
+            "\"enum\":[\"Accepted\",\"Pending\",\"Rejected\"]}}}"))))
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => assert_contains(src,
@@ -130,7 +130,8 @@ fn test_primitive_array() -> Result[Unit, Str] {
         str.concat("\"properties\":{",
           str.concat("\"items\":{\"type\":\"array\",",
             str.concat("\"items\":{\"type\":\"string\",\"maxLength\":40},",
-              "\"minItems\":1}}}"))))))  match gen.generate(schema) {
+              "\"minItems\":1}}}"))))))
+  match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) =>
       match assert_contains(src, "KStr([StrMaxLen(40)])", "array element kind") {
@@ -169,7 +170,8 @@ fn test_format_email() -> Result[Unit, Str] {
     str.concat("{\"title\":\"Contact\",\"type\":\"object\",",
       str.concat("\"required\":[\"email\"],",
         str.concat("\"properties\":{",
-          "\"email\":{\"type\":\"string\",\"format\":\"email\"}}}")))  match gen.generate(schema) {
+          "\"email\":{\"type\":\"string\",\"format\":\"email\"}}}")))  
+  match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => assert_contains(src, "StrEmail", "email format"),
   }
@@ -180,7 +182,8 @@ fn test_format_uri() -> Result[Unit, Str] {
     str.concat("{\"title\":\"Link\",\"type\":\"object\",",
       str.concat("\"required\":[\"href\"],",
         str.concat("\"properties\":{",
-          "\"href\":{\"type\":\"string\",\"format\":\"uri\"}}}")))  match gen.generate(schema) {
+          "\"href\":{\"type\":\"string\",\"format\":\"uri\"}}}")))  
+  match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => assert_contains(src, "StrUrl", "uri format → StrUrl"),
   }
@@ -191,7 +194,8 @@ fn test_format_uuid() -> Result[Unit, Str] {
     str.concat("{\"title\":\"Entity\",\"type\":\"object\",",
       str.concat("\"required\":[\"id\"],",
         str.concat("\"properties\":{",
-          "\"id\":{\"type\":\"string\",\"format\":\"uuid\"}}}")))  match gen.generate(schema) {
+          "\"id\":{\"type\":\"string\",\"format\":\"uuid\"}}}")))  
+  match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => assert_contains(src, "StrUuid", "uuid format"),
   }
@@ -202,7 +206,8 @@ fn test_format_unknown_dropped() -> Result[Unit, Str] {
     str.concat("{\"title\":\"X\",\"type\":\"object\",",
       str.concat("\"required\":[\"v\"],",
         str.concat("\"properties\":{",
-          "\"v\":{\"type\":\"string\",\"format\":\"klingon-glyph\"}}}")))  match gen.generate(schema) {
+          "\"v\":{\"type\":\"string\",\"format\":\"klingon-glyph\"}}}")))  
+  match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => {
       if str.contains(src, "Klingon") { fail("unknown format leaked") }
@@ -266,11 +271,12 @@ fn test_oneof_discriminated() -> Result[Unit, Str] {
       str.concat("\"oneOf\":[{\"type\":\"object\",",
         str.concat("\"required\":[\"kind\",\"user_id\"],",
           str.concat("\"properties\":{\"kind\":{\"const\":\"signup\"},",
-            str.concat("\"user_id\":{\"type\":\"string\"}}},",
+            str.concat("\"user_id\":{\"type\":\"string\"}}}},",
               str.concat("{\"type\":\"object\",",
                 str.concat("\"required\":[\"kind\",\"amount\"],",
                   str.concat("\"properties\":{\"kind\":{\"const\":\"purchase\"},",
-                    "\"amount\":{\"type\":\"integer\"}}}]}")))))))))  match gen.generate(schema) {
+                    "\"amount\":{\"type\":\"integer\"}}}]}"))))))))
+  match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) =>
       match assert_contains(src, "fn event_signup_schema()", "signup branch") {
