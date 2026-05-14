@@ -302,7 +302,7 @@ fn emit_field_inner(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
     Some(ref_name) => str.concat("s.required_object(\"",
       str.concat(name,
         str.concat("\", ",
-          str.concat(snake_case(ref_name), "_schema())")))),
+          str.concat(snake_case(ref_name), "_schema()")))),
     None => {
       let ty := field_str_or(spec, "type", "string")
       match ty {
@@ -337,11 +337,11 @@ fn emit_int_field(name :: Str, spec :: jv.Json) -> Str {
 }
 
 fn emit_float_field(name :: Str, _spec :: jv.Json) -> Str {
-  str.concat("s.required_float(\"", str.concat(name, "\", [])"))
+  str.concat("s.required_float(\"", str.concat(name, "\", [])")
 }
 
 fn emit_bool_field(name :: Str) -> Str {
-  str.concat("s.required_bool(\"", str.concat(name, "\")"))
+  str.concat("s.required_bool(\"", str.concat(name, "\""))
 }
 
 fn emit_array_field(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
@@ -349,7 +349,7 @@ fn emit_array_field(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
     None              => "KStr([])",
     Some(items_spec)  => match resolve_ref(items_spec, root) {
       Some(ref_name) => str.concat("KObject(",
-        str.concat(snake_case(ref_name), "_schema())")),
+        str.concat(snake_case(ref_name), "_schema())"))),
       None => match field_str_or(items_spec, "type", "string") {
         "string"  => str.concat("KStr(", str.concat(emit_str_checks(items_spec), ")")),
         "integer" => str.concat("KInt(", str.concat(emit_int_checks(items_spec), ")")),
@@ -365,7 +365,7 @@ fn emit_array_field(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
     str.concat(name,
       str.concat("\", ",
         str.concat(elem_kind,
-          str.concat(", ", str.concat(shape_checks, ")"))))))
+          str.concat(", ", str.concat(shape_checks, ")")))))
 }
 
 # ---- $ref resolution ---------------------------------------------
@@ -520,10 +520,10 @@ fn emit_int_checks(spec :: jv.Json) -> Str {
   match (lo_o, hi_o) {
     (Some(lo), Some(hi)) => str.concat("[IntInRange(",
       str.concat(int.to_str(lo),
-        str.concat(", ", str.concat(int.to_str(hi), ")]")))),
+        str.concat(", ", str.concat(int.to_str(hi), ")]"))))  ,
     (Some(lo), None) => if lo == 0 { "[IntNonNegative]" }
       else { str.concat("[IntMin(", str.concat(int.to_str(lo), ")]")) },
-    (None, Some(hi)) => str.concat("[IntMax(", str.concat(int.to_str(hi), ")]")),
+    (None, Some(hi)) => str.concat("[IntMax(", str.concat(int.to_str(hi), ")]"))),
     _ => "[]",
   }
 }
@@ -605,27 +605,27 @@ fn is_upper(c :: Str) -> Bool {
 # ---- Demo entry --------------------------------------------------
 
 fn demo() -> Str {
-  let sample := "{\"title\":\"AuthorizeRequest\","
-             + "\"description\":\"OCPP 2.0.1 Authorize\","
-             + "\"type\":\"object\","
-             + "\"$defs\":{"
-             +   "\"IdToken\":{"
-             +     "\"type\":\"object\","
-             +     "\"required\":[\"idToken\",\"type\"],"
-             +     "\"properties\":{"
-             +       "\"idToken\":{\"type\":\"string\",\"maxLength\":36},"
-             +       "\"type\":{\"type\":\"string\",\"enum\":[\"Central\",\"ISO14443\"]}"
-             +     "}"
-             +   "}"
-             + "},"
-             + "\"required\":[\"idToken\"],"
-             + "\"properties\":{"
-             +   "\"idToken\":{\"$ref\":\"#/$defs/IdToken\"},"
-             +   "\"certificate\":{\"type\":\"string\",\"maxLength\":5500,"
-             +                    "\"format\":\"uri\"}"
-             + "}}"
+  let id_token_props :=
+    str.concat("\"idToken\":{\"type\":\"string\",\"maxLength\":36},",
+      "\"type\":{\"type\":\"string\",\"enum\":[\"Central\",\"ISO14443\"]}")
+  let id_token_def :=
+    str.concat("{\"type\":\"object\",\"required\":[\"idToken\",\"type\"],\"properties\":{",
+      str.concat(id_token_props, "}}"))
+  let defs_block :=
+    str.concat("\"$defs\":{\"IdToken\":", str.concat(id_token_def, "},"))
+  let root_props :=
+    str.concat("\"idToken\":{\"$ref\":\"#/$defs/IdToken\"},",
+      "\"certificate\":{\"type\":\"string\",\"maxLength\":5500,\"format\":\"uri\"}")
+  let sample :=
+    str.concat("{\"title\":\"AuthorizeRequest\",",
+      str.concat("\"description\":\"OCPP 2.0.1 Authorize\",",
+        str.concat("\"type\":\"object\",",
+          str.concat(defs_block,
+            str.concat("\"required\":[\"idToken\"],",
+              str.concat("\"properties\":{",
+                str.concat(root_props, "}}"))))))) 
   match generate(sample) {
     Ok(src)  => src,
-    Err(msg) => str.concat("ERROR: ", msg),
+    Err(e)   => str.concat("ERROR: ", e),
   }
 }
