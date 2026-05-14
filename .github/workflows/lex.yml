@@ -119,10 +119,12 @@ jobs:
           echo "test_v21_schemas.lex: $out failure(s)"
           [ "$out" = "0" ] || { echo "::error::test_v21_schemas reported $out failure(s)"; exit 1; }
 
+      # crypto effect required: argon2id and HMAC-SHA256 are gated
+      # at the lex runtime boundary even when declared pure in types.
       - name: Test test_security.lex
         working-directory: lex-ocpp
         run: |
-          out=$(lex run tests/test_security.lex run_all)
+          out=$(lex run --allow-effects crypto tests/test_security.lex run_all)
           echo "test_security.lex: $out failure(s)"
           [ "$out" = "0" ] || { echo "::error::test_security reported $out failure(s)"; exit 1; }
 
