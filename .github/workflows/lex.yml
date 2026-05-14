@@ -41,7 +41,7 @@ jobs:
 
       - name: Install Lex toolchain
         run: |
-          git clone --depth=1 https://github.com/alpibrusl/lex-lang /tmp/lex-lang
+          git clone --depth=1 --branch v0.9.3 https://github.com/alpibrusl/lex-lang /tmp/lex-lang
           cd /tmp/lex-lang && cargo build --release -p lex-cli
           echo "/tmp/lex-lang/target/release" >> $GITHUB_PATH
 
