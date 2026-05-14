@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  # Pinned at scaffold time. Bump when you upgrade the toolchain.
+  # lex 0.9.2 brings: cross-package examples-block name resolution
+  # (alpibrusl/lex-lang#391), pre-built CI binaries, std.time.now_str,
+  # AEAD / KDF crypto primitives.
+  LEX_VERSION: v0.9.2
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,9 +22,9 @@ jobs:
         with:
           path: lex-ocpp
 
-      # lex-ocpp's lex.toml resolves lex-schema and lex-web via path
-      # = "../<sibling>". CI runners don't have the siblings locally,
-      # so we clone them next to lex-ocpp.
+      # lex-ocpp's lex.toml resolves lex-schema + lex-web via
+      # `path = "../<sibling>"`. CI runners don't have the siblings
+      # pre-cloned, so we check them out next to lex-ocpp.
       - name: Checkout lex-schema (sibling)
         uses: actions/checkout@v4
         with:
@@ -30,109 +37,56 @@ jobs:
           repository: alpibrusl/lex-web
           path: lex-web
 
-      # Stopgap for alpibrusl/lex-lang#391 — three `examples { }`
-      # blocks in lex-schema's src/schema.lex reference local
-      # top-level fns and fail to resolve when the file is imported
-      # across package boundaries. Drop the first (only one we
-      # actually hit on the import chain) so `lex pkg install` works
-      # downstream. Tracked at alpibrusl/lex-schema#5; remove this
-      # step once that lands.
-      - name: Apply lex-schema#5 stopgap
+      - name: Install Lex toolchain (pre-built binary)
         run: |
-          python3 - <<'PY'
-          import re
-          path = "lex-schema/src/schema.lex"
-          with open(path) as f: src = f.read()
-          new = re.sub(
-            r"fn optional\(field :: Field\) -> Field\n  examples \{\n.*?\n  \}\n\{",
-            "fn optional(field :: Field) -> Field\n{",
-            src, count=1, flags=re.DOTALL,
-          )
-          assert new != src, "stopgap pattern didn't match — has lex-schema been fixed upstream?"
-          with open(path, "w") as f: f.write(new)
-          PY
+          set -euo pipefail
+          TARGET=x86_64-unknown-linux-gnu
+          URL="https://github.com/alpibrusl/lex-lang/releases/download/${LEX_VERSION}/lex-${LEX_VERSION}-${TARGET}.tar.gz"
+          curl -sSfL "$URL" | tar -xz
+          sudo install -m 0755 "lex-${LEX_VERSION}-${TARGET}/lex" /usr/local/bin/lex
+          lex --version
 
-      - name: Cache cargo registry + lex-lang build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            lex-lang/target
-          key: lex-${{ runner.os }}-${{ hashFiles('lex-lang/Cargo.lock') }}
-
-      - name: Install Lex toolchain
-        run: |
-          git clone --depth=1 https://github.com/alpibrusl/lex-lang lex-lang
-          cd lex-lang && cargo build --release --bin lex
-          echo "${{ github.workspace }}/lex-lang/target/release" >> "$GITHUB_PATH"
-
-      - name: Resolve package dependencies
+      - name: Install package dependencies
         working-directory: lex-ocpp
         run: lex pkg install
 
-      - name: Type-check src/
+      # `lex ci` runs:
+      #   pkg install → check --strict src/ → fmt --check src/ tests/
+      #   → test (every tests/test_*.lex; subdirs are ignored)
+      #
+      # `--no-fmt` until the generated source (tools/gen.lex emits
+      # Lex fragments) and the v0.3 hand-written code have been
+      # through `lex fmt` — separate cleanup pass.
+      - name: lex ci (pkg install + check --strict + test)
+        working-directory: lex-ocpp
+        run: lex ci --no-fmt
+
+      # Effect-flavoured suite — `lex test` runs under
+      # `Policy::permissive()` which is missing `sql`
+      # (alpibrusl/lex-lang#399), so we run the [io, time, sql]
+      # suite via `lex run` with explicit grants. Sitting in
+      # tests/effectful/ keeps `lex test` skipping it (the runner
+      # is non-recursive). Folds back into `lex ci` once #399 lands.
+      - name: Run effectful test suite
+        working-directory: lex-ocpp
+        run: |
+          out=$(lex run --allow-effects io,sql,time \
+            tests/effectful/test_route_io.lex run_all)
+          echo "test_route_io.lex: $out"
+          [ "$out" = "0" ] || { echo "::error::test_route_io reported $out failure(s)"; exit 1; }
+
+      # Belt-and-braces: every file under tools/ and examples/ that
+      # `lex ci` doesn't reach should still type-check.
+      - name: Type-check tools/ + examples/
         working-directory: lex-ocpp
         run: |
           set -e
-          for f in $(find src -name '*.lex' | sort); do
+          for f in $(find tools examples -name '*.lex' | sort); do
             echo "=== $f ==="
             lex check "$f"
           done
 
-      - name: Type-check tools/
-        working-directory: lex-ocpp
-        run: |
-          set -e
-          for f in $(find tools -name '*.lex' | sort); do
-            echo "=== $f ==="
-            lex check "$f"
-          done
-
-      - name: Type-check tests/
-        working-directory: lex-ocpp
-        run: |
-          set -e
-          for f in $(find tests -name '*.lex' | sort); do
-            echo "=== $f ==="
-            lex check "$f"
-          done
-
-      - name: Type-check examples/
-        working-directory: lex-ocpp
-        run: |
-          set -e
-          for f in $(find examples -name '*.lex' | sort); do
-            echo "=== $f ==="
-            lex check "$f"
-          done
-
-      # `lex test` only resolves single-file imports, so we run each
-      # suite via `lex run` and assert the failure count is zero.
-      # Effect-needing suites (test_*_io.lex) get [io, sql, time]
-      # grants explicitly; everyone else runs pure.
-      - name: Run test suites
-        working-directory: lex-ocpp
-        run: |
-          set -e
-          total_fail=0
-          for f in tests/test_*.lex; do
-            if [[ "$f" == *"_io"* ]]; then
-              out=$(lex run --allow-effects io,sql,time "$f" run_all)
-            else
-              out=$(lex run "$f" run_all)
-            fi
-            echo "$(basename $f): $out"
-            if [ "$out" != "0" ]; then
-              total_fail=$((total_fail + 1))
-            fi
-          done
-          if [ "$total_fail" -gt 0 ]; then
-            echo "::error::$total_fail suite(s) reported failures"
-            exit 1
-          fi
-
-      - name: Smoke-run examples (pure-frame demo)
+      - name: Smoke-run charger frame demo
         working-directory: lex-ocpp
         run: lex run --allow-effects io examples/charger_frames.lex main | head -10
 

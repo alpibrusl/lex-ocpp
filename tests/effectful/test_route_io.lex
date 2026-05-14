@@ -14,10 +14,10 @@ import "std.list" as list
 import "lex-schema/json_value" as jv
 import "lex-schema/error"      as e
 
-import "../src/messages" as msg
-import "../src/route"    as route
-import "../src/route_io" as rio
-import "../src/error"    as oe
+import "../../src/messages" as msg
+import "../../src/route"    as route
+import "../../src/route_io" as rio
+import "../../src/error"    as oe
 
 # ---- Test scaffolding --------------------------------------------
 
