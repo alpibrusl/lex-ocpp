@@ -20,7 +20,6 @@
 # Effects: none. Sit this module behind any transport-flavoured
 # adapter ([net], [io], etc.); the adapter declares the effects.
 
-import "std.str"  as str
 import "std.list" as list
 
 import "lex-schema/json_value" as jv
