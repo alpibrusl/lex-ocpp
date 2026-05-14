@@ -1,9 +1,4 @@
 # lex-ocpp — OCPP 1.6 schema validation tests
-#
-# Exercise every CP→CS request validator with a known-good payload
-# (Ok branch) and a known-bad payload (Err branch). For Err cases
-# we don't pin specific error codes — just assert the validator
-# surfaces something.
 
 import "std.str"  as str
 import "std.list" as list
@@ -115,7 +110,7 @@ fn test_start_transaction_ok() -> Result[Unit, Str] {
 
 fn test_start_transaction_zero_connector() -> Result[Unit, Str] {
   let payload := JObj([
-    ("connectorId", JInt(0)),                # connectorId must be >= 1
+    ("connectorId", JInt(0)),
     ("idTag",       JStr("USER-001")),
     ("meterStart",  JInt(0)),
     ("timestamp",   JStr("2026-05-13T12:00:00Z")),
@@ -167,7 +162,7 @@ fn test_meter_values_ok() -> Result[Unit, Str] {
 fn test_meter_values_empty_list() -> Result[Unit, Str] {
   let payload := JObj([
     ("connectorId", JInt(1)),
-    ("meterValue",  JList([])),         # spec: ListNonEmpty
+    ("meterValue",  JList([])),
   ])
   assert_err(sch.validate_meter_values_req(payload), "meter_values_empty")
 }
@@ -258,9 +253,9 @@ fn suite() -> List[Result[Unit, Str]] {
   ]
 }
 
-fn run_all() -> Int {
-  list.fold(suite(), 0,
+fn run_all() -> () {
+  assert list.fold(suite(), 0,
     fn (n :: Int, r :: Result[Unit, Str]) -> Int {
       match r { Ok(_) => n, Err(_) => n + 1 }
-    })
+    }) == 0
 }

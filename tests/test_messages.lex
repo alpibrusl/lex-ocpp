@@ -1,13 +1,4 @@
 # lex-ocpp — frame parse / encode tests
-#
-# Round-trip every canonical OCPP-J frame shape:
-#   Call         [2, "id", "Action", {}]
-#   CallResult   [3, "id", {}]
-#   CallError    [4, "id", "Code", "Description", {}]
-#
-# Plus malformed-input cases: bad JSON, wrong arity, wrong types
-# in fixed positions. The decoder should never panic — every error
-# surfaces as a `FrameError` value.
 
 import "std.str"  as str
 import "std.list" as list
@@ -160,12 +151,12 @@ fn suite() -> List[Result[Unit, Str]] {
   ]
 }
 
-fn run_all() -> Int {
-  list.fold(suite(), 0,
+fn run_all() -> () {
+  assert list.fold(suite(), 0,
     fn (n :: Int, r :: Result[Unit, Str]) -> Int {
       match r {
         Ok(_)  => n,
         Err(_) => n + 1,
       }
-    })
+    }) == 0
 }

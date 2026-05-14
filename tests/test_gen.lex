@@ -157,7 +157,7 @@ fn test_pattern_constraint() -> Result[Unit, Str] {
              + "\"required\":[\"v\"],"
              + "\"properties\":{"
              +   "\"v\":{\"type\":\"string\","
-             +   "\"pattern\":\"^\\\\+[1-9][0-9]+$\"}"
+             +   "\"pattern\":\"^\\\\\\\\+[1-9][0-9]+$\"}"
              + "}}"
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
@@ -202,7 +202,6 @@ fn test_format_uuid() -> Result[Unit, Str] {
 }
 
 fn test_format_unknown_dropped() -> Result[Unit, Str] {
-  # Unknown formats must be silently dropped per JSON Schema spec.
   let schema := "{\"title\":\"X\",\"type\":\"object\","
              + "\"required\":[\"v\"],"
              + "\"properties\":{"
@@ -211,9 +210,6 @@ fn test_format_unknown_dropped() -> Result[Unit, Str] {
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => {
-      # The check list should be empty (no constraint emitted for the
-      # unknown format). Just verify we didn't error and didn't emit
-      # a fake "StrKlingon" constraint.
       if str.contains(src, "Klingon") { fail("unknown format leaked") }
       else { pass() }
     },
@@ -268,7 +264,6 @@ fn test_ref_in_array_items() -> Result[Unit, Str] {
 }
 
 fn test_definitions_keyword() -> Result[Unit, Str] {
-  # Older JSON Schema drafts use `definitions` instead of `$defs`.
   let schema := "{\"title\":\"OldDraft\",\"type\":\"object\","
              + "\"definitions\":{"
              +   "\"Legacy\":{"
@@ -330,7 +325,6 @@ fn suite() -> List[Result[Unit, Str]] {
     test_int_non_negative(),
     test_primitive_array(),
     test_invalid_json(),
-    # v0.3 extensions (#1)
     test_pattern_constraint(),
     test_format_email(),
     test_format_uri(),
@@ -343,9 +337,9 @@ fn suite() -> List[Result[Unit, Str]] {
   ]
 }
 
-fn run_all() -> Int {
-  list.fold(suite(), 0,
+fn run_all() -> () {
+  assert list.fold(suite(), 0,
     fn (n :: Int, r :: Result[Unit, Str]) -> Int {
       match r { Ok(_) => n, Err(_) => n + 1 }
-    })
+    }) == 0
 }

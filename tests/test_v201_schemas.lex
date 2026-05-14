@@ -1,9 +1,4 @@
 # lex-ocpp — OCPP 2.0.1 schema validation tests (smoke)
-#
-# OCPP 2.0.1 covers many more actions than 1.6; the test surface
-# here exercises the framing patterns (nested records, required-vs-
-# optional, enum constraints). Add more cases by following the
-# pattern in tests/test_v16_schemas.lex.
 
 import "std.str"  as str
 import "std.list" as list
@@ -285,9 +280,9 @@ fn suite() -> List[Result[Unit, Str]] {
   ]
 }
 
-fn run_all() -> Int {
-  list.fold(suite(), 0,
+fn run_all() -> () {
+  assert list.fold(suite(), 0,
     fn (n :: Int, r :: Result[Unit, Str]) -> Int {
       match r { Ok(_) => n, Err(_) => n + 1 }
-    })
+    }) == 0
 }

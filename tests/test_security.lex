@@ -77,10 +77,10 @@ fn test_issue_and_decode_cp_token() -> Bool {
   }
 }
 
-fn run_all() -> Int {
-  (if test_password_verify_known_hash()     { 0 } else { 1 }) +
-  (if test_wrong_password_does_not_verify() { 0 } else { 1 }) +
-  (if test_authenticate_ok()               { 0 } else { 1 }) +
-  (if test_authenticate_wrong_pass()       { 0 } else { 1 }) +
-  (if test_issue_and_decode_cp_token()     { 0 } else { 1 })
+fn run_all() -> () {
+  assert test_password_verify_known_hash()
+  assert test_wrong_password_does_not_verify()
+  assert test_authenticate_ok()
+  assert test_authenticate_wrong_pass()
+  assert test_issue_and_decode_cp_token()
 }
