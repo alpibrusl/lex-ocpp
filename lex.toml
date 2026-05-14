@@ -4,8 +4,16 @@ version = "0.1.0"
 lex     = "0.9.3"
 
 # OCPP (Open Charge Point Protocol) library for lex-lang.
+# Inspired by https://github.com/mobilityhouse/ocpp — same shape
+# (Call / CallResult / CallError framing, action catalogues for
+# v1.6 and v2.0.1, handler-registry dispatch), reworked for Lex's
+# effect system, variant ADTs, and pure-core / effect-edge split.
+#
+# Transport-agnostic: src/ has no `[net]` effect. Wire it up to
+# any WebSocket carrier; examples/ uses lex-web.
+#
 # 0.9.3: net.dial_ws enables outbound wss:// charge-point connections;
-#        permissive-policy fix unblocks lex ci test suite.
+#        permissive-policy fix (#399) unblocks lex ci test suite.
 [dependencies]
-lex-schema = { git = "https://github.com/alpibrusl/lex-schema" }
-lex-web    = { git = "https://github.com/alpibrusl/lex-web" }
+lex-schema = { path = "../lex-schema" }
+lex-web    = { path = "../lex-web" }
