@@ -53,8 +53,12 @@ jobs:
           set -euo pipefail
           TARGET=x86_64-unknown-linux-gnu
           URL="https://github.com/alpibrusl/lex-lang/releases/download/${LEX_VERSION}/lex-${LEX_VERSION}-${TARGET}.tar.gz"
-          curl -sSfL "$URL" | tar -xz
-          sudo install -m 0755 "lex-${LEX_VERSION}-${TARGET}/lex" /usr/local/bin/lex
+          curl -sSfL "$URL" -o lex.tar.gz
+          tar -xzf lex.tar.gz
+          rm lex.tar.gz
+          sudo install -m 0755 \
+            "$(find . -maxdepth 2 -name 'lex' -type f -perm /111 | head -1)" \
+            /usr/local/bin/lex
           lex --version
 
       - name: Install package dependencies
