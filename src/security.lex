@@ -18,15 +18,13 @@
 #     on reconnect. Use issue_cp_token() + verify_cp_token().
 #
 # Effects:
-#   hash_password    — [crypto]  (random salt via crypto.random_str_hex)
+#   hash_password    — pure  (caller supplies salt :: Bytes)
 #   verify_password  — pure
 #   authenticate     — pure
 #   issue_cp_token   — [time]
 #   verify_cp_token  — [time]
 
-import "std.bytes"  as bytes
-import "std.crypto" as crypto
-import "std.time"   as time
+import "std.time" as time
 
 import "lex-crypto/jwt"      as jwt
 import "lex-crypto/password" as pw
@@ -34,11 +32,11 @@ import "lex-crypto/password" as pw
 # ---- Security Profile 2: argon2id password management -----------
 
 # Hash a charge-point password for storage in the CSMS database.
-# Generates a fresh 16-byte random salt on each call, runs argon2id
-# (t=3, m=64 MiB), and returns a PHC-format string for db storage.
-fn hash_password(password :: Str) -> [crypto] Result[Str, Str] {
-  let salt_hex := crypto.random_str_hex(16)
-  pw.hash_argon2id(password, bytes.from_str(salt_hex))
+# The caller must supply a cryptographically random salt (16 bytes
+# is standard; use your platform's CSPRNG before calling this).
+# Returns a PHC-format string suitable for database storage.
+fn hash_password(password :: Str, salt :: Bytes) -> Result[Str, Str] {
+  pw.hash_argon2id(password, salt)
 }
 
 # Verify a plaintext password against a stored argon2id hash.
@@ -67,9 +65,6 @@ fn authenticate(stored_hash :: Str, password :: Str) -> Result[Unit, Str] {
 # Issue a short-lived HS256 JWT identifying a charge point.
 # `cp_id` becomes the `sub` claim; `ttl_secs` is typically 3600
 # (initial auth) or 300 (re-auth / token refresh).
-# The CSMS presents this token to the CP in a SecurityEventNotification
-# or as a response to a SignCertificate; the CP caches it and sends
-# it back as Authorization: Bearer on subsequent connections.
 fn issue_cp_token(
   secret   :: Bytes,
   cp_id    :: Str,
