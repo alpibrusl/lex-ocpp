@@ -55,7 +55,7 @@ fn test_required_and_optional() -> Result[Unit, Str] {
       str.concat("\"required\":[\"email\"],",
         str.concat("\"properties\":{",
           str.concat("\"email\":{\"type\":\"string\"},",
-            "\"nickname\":{\"type\":\"string\"}}}")))
+            "\"nickname\":{\"type\":\"string\"}}}"))))
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) =>
@@ -73,7 +73,7 @@ fn test_enum_constraint() -> Result[Unit, Str] {
       str.concat("\"required\":[\"value\"],",
         str.concat("\"properties\":{",
           str.concat("\"value\":{\"type\":\"string\",",
-            "\"enum\":[\"Accepted\",\"Pending\",\"Rejected\"]}}}"))))
+            "\"enum\":[\"Accepted\",\"Pending\",\"Rejected\"]}}}")))
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => assert_contains(src,
@@ -116,7 +116,7 @@ fn test_int_non_negative() -> Result[Unit, Str] {
     str.concat("{\"title\":\"Count\",\"type\":\"object\",",
       str.concat("\"required\":[\"n\"],",
         str.concat("\"properties\":{",
-          "\"n\":{\"type\":\"integer\",\"minimum\":0}}}")))
+          "\"n\":{\"type\":\"integer\",\"minimum\":0}}}")))  
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => assert_contains(src, "IntNonNegative", "non-negative int"),
@@ -130,7 +130,7 @@ fn test_primitive_array() -> Result[Unit, Str] {
         str.concat("\"properties\":{",
           str.concat("\"items\":{\"type\":\"array\",",
             str.concat("\"items\":{\"type\":\"string\",\"maxLength\":40},",
-              "\"minItems\":1}}}"))))))
+              "\"minItems\":1}}}")))))
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) =>
@@ -275,7 +275,7 @@ fn test_oneof_discriminated() -> Result[Unit, Str] {
               str.concat("{\"type\":\"object\",",
                 str.concat("\"required\":[\"kind\",\"amount\"],",
                   str.concat("\"properties\":{\"kind\":{\"const\":\"purchase\"},",
-                    "\"amount\":{\"type\":\"integer\"}}}]}"))))))))
+                    "\"amount\":{\"type\":\"integer\"}}}]}")))))))
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) =>

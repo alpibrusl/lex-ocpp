@@ -287,7 +287,7 @@ fn emit_field_inner(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
             str.concat("\", /* inline nested object — promote to $defs */ ",
               "_nested_schema())"))),
         _ => str.concat("s.required_str(\"",
-               str.concat(name, "\", [])"))  ,
+               str.concat(name, "\", [])")),
       }
     },
   }
@@ -308,11 +308,11 @@ fn emit_int_field(name :: Str, spec :: jv.Json) -> Str {
 }
 
 fn emit_float_field(name :: Str, _spec :: jv.Json) -> Str {
-  str.concat("s.required_float(\"", str.concat(name, "\", []))"))
+  str.concat("s.required_float(\"", str.concat(name, "\", [])"))
 }
 
 fn emit_bool_field(name :: Str) -> Str {
-  str.concat("s.required_bool(\"", str.concat(name, "\")"))
+  str.concat("s.required_bool(\"", str.concat(name, "\""))
 }
 
 fn emit_array_field(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
@@ -320,7 +320,7 @@ fn emit_array_field(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
     None              => "KStr([])",
     Some(items_spec)  => match resolve_ref(items_spec, root) {
       Some(ref_name) => str.concat("KObject(",
-        str.concat(snake_case(ref_name), "_schema())")),
+        str.concat(snake_case(ref_name), "_schema())"))
       None => match field_str_or(items_spec, "type", "string") {
         "string"  => str.concat("KStr(", str.concat(emit_str_checks(items_spec), ")")),
         "integer" => str.concat("KInt(", str.concat(emit_int_checks(items_spec), ")")),
@@ -426,7 +426,7 @@ fn pattern_check(spec :: jv.Json) -> List[Str] {
     Some(j)   => match jv.as_str(j) {
       None    => [],
       Some(p) => [str.concat("StrPattern(\"",
-                    str.concat(escape_str_literal(p), "\")"))],
+                    str.concat(escape_str_literal(p), "\""))],
     },
   }
 }
@@ -475,7 +475,7 @@ fn emit_int_checks(spec :: jv.Json) -> Str {
   match (lo_o, hi_o) {
     (Some(lo), Some(hi)) => str.concat("[IntInRange(",
       str.concat(int.to_str(lo),
-        str.concat(", ", str.concat(int.to_str(hi), ")]"))))),
+        str.concat(", ", str.concat(int.to_str(hi), ")]")))),
     (Some(lo), None) => if lo == 0 { "[IntNonNegative]" }
       else { str.concat("[IntMin(", str.concat(int.to_str(lo), ")]")) },
     (None, Some(hi)) => str.concat("[IntMax(", str.concat(int.to_str(hi), ")]")) ,
