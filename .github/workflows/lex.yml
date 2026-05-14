@@ -41,13 +41,18 @@ jobs:
 
       - name: Install Lex toolchain
         run: |
-          git clone --depth=1 --branch v0.9.3 https://github.com/alpibrusl/lex-lang /tmp/lex-lang
-          cd /tmp/lex-lang && cargo build --release -p lex-cli
-          echo "/tmp/lex-lang/target/release" >> $GITHUB_PATH
+          curl -fsSL https://github.com/alpibrusl/lex-lang/releases/download/v0.9.3/lex-v0.9.3-x86_64-unknown-linux-gnu.tar.gz \
+            | tar -xz -C /tmp/
+          echo "/tmp/lex-v0.9.3-x86_64-unknown-linux-gnu" >> $GITHUB_PATH
 
-      - name: Install package dependencies
-        working-directory: lex-ocpp
-        run: lex pkg install
+      # Pre-populate the lex package cache:
+      # - lex-crypto: direct git dep of lex-ocpp
+      # - lex-schema: transitive git dep (lex-crypto's lex.toml references it)
+      - name: Fetch git package dependencies
+        run: |
+          mkdir -p ~/.lex/packages
+          git clone --depth=1 https://github.com/alpibrusl/lex-crypto ~/.lex/packages/lex-crypto
+          git clone --depth=1 https://github.com/alpibrusl/lex-schema ~/.lex/packages/lex-schema
 
       # Pure entry point: covers messages.lex, route.lex, error.lex.
       - name: Type-check charge_point.lex (strict)
