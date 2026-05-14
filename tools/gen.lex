@@ -52,10 +52,7 @@ fn emit_top_level(root :: jv.Json) -> Str {
   let model_name  := snake_case(title)
   let model_fn    := str.concat(model_name, "_schema")
   let validator_fn := str.concat("validate_", model_name)
-  # 1. Emit every $defs entry first as its own schema-helper fn.
   let defs_src := emit_all_defs(root)
-  # 2. Detect a top-level oneOf discriminator — if present, emit a
-  #    dispatcher and skip the regular object emitter for the root.
   let body := match detect_discriminator(root) {
     Some(d) => emit_discriminator_dispatcher(model_name, d),
     None    => emit_model_schema_fn(model_fn, title, description,
@@ -94,12 +91,6 @@ fn emit_validator_fn(validator_fn :: Str, schema_fn :: Str) -> Str {
 }
 
 # ---- $defs / definitions emission --------------------------------
-#
-# Both keywords are accepted (JSON Schema 2020-12 uses `$defs`,
-# older drafts used `definitions`). For each entry, emit a
-# top-level schema-helper fn named `<snake_case>_schema`. The
-# caller side (emit_field_inner) detects `$ref` and replaces the
-# normal emitter with a call to the helper.
 
 fn emit_all_defs(root :: jv.Json) -> Str {
   let from_defs        := emit_defs_at(root, "$defs", root)
@@ -131,20 +122,6 @@ fn emit_one_def(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
 }
 
 # ---- Discriminated union (oneOf) detection ----------------------
-#
-# An OCPP-style discriminated union looks like:
-#
-#   { "oneOf": [
-#       { "type": "object",
-#         "properties": { "<tag>": { "const": "<value-A>" }, ... },
-#         "required": ["<tag>", ...] },
-#       { ... },
-#       ...
-#     ]
-#   }
-#
-# detect_discriminator returns the tag name + list of (value, sub-schema)
-# pairs if the shape matches, None otherwise.
 
 type Discriminator = {
   tag      :: Str,
@@ -159,9 +136,6 @@ fn detect_discriminator(root :: jv.Json) -> Option[Discriminator] {
       Some(arms) =>
         if list.is_empty(arms) { None }
         else {
-          # Take the discriminator tag from the first arm's first
-          # `const`-valued property; require every other arm to
-          # use the same tag.
           match find_first_const_tag(arms) {
             None      => None,
             Some(tag) => match collect_branches(tag, arms) {
@@ -234,8 +208,6 @@ fn emit_discriminator_dispatcher(
   model_name :: Str,
   d          :: Discriminator
 ) -> Str {
-  # Emit one validate fn per branch (named for the branch value),
-  # then a dispatcher that calls union.discriminate.
   let branches_src := list.fold(d.branches, "",
     fn (acc :: Str, pair :: (Str, jv.Json)) -> Str {
       let val  := match pair { (v, _) => v }
@@ -297,7 +269,6 @@ fn emit_field(
 }
 
 fn emit_field_inner(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
-  # $ref takes priority over type.
   match resolve_ref(spec, root) {
     Some(ref_name) => str.concat("s.required_object(\"",
       str.concat(name,
@@ -316,7 +287,7 @@ fn emit_field_inner(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
             str.concat("\", /* inline nested object — promote to $defs */ ",
               "_nested_schema())"))),
         _ => str.concat("s.required_str(\"",
-               str.concat(name, "\", [])  /* unknown type, fallback to string */")),
+               str.concat(name, "\", [])"))  ,
       }
     },
   }
@@ -337,11 +308,11 @@ fn emit_int_field(name :: Str, spec :: jv.Json) -> Str {
 }
 
 fn emit_float_field(name :: Str, _spec :: jv.Json) -> Str {
-  str.concat("s.required_float(\"", str.concat(name, "\", [])")
+  str.concat("s.required_float(\"", str.concat(name, "\", []))"))
 }
 
 fn emit_bool_field(name :: Str) -> Str {
-  str.concat("s.required_bool(\"", str.concat(name, "\""))
+  str.concat("s.required_bool(\"", str.concat(name, "\")"))
 }
 
 fn emit_array_field(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
@@ -349,7 +320,7 @@ fn emit_array_field(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
     None              => "KStr([])",
     Some(items_spec)  => match resolve_ref(items_spec, root) {
       Some(ref_name) => str.concat("KObject(",
-        str.concat(snake_case(ref_name), "_schema())"))),
+        str.concat(snake_case(ref_name), "_schema())")),
       None => match field_str_or(items_spec, "type", "string") {
         "string"  => str.concat("KStr(", str.concat(emit_str_checks(items_spec), ")")),
         "integer" => str.concat("KInt(", str.concat(emit_int_checks(items_spec), ")")),
@@ -369,10 +340,6 @@ fn emit_array_field(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
 }
 
 # ---- $ref resolution ---------------------------------------------
-#
-# Supports `#/$defs/<Name>` and `#/definitions/<Name>` (JSON Schema
-# 2020-12 + older drafts respectively). External refs across files
-# are deferred — see issue #1 follow-ups.
 
 fn resolve_ref(spec :: jv.Json, _root :: jv.Json) -> Option[Str] {
   match jv.get_field(spec, "$ref") {
@@ -385,8 +352,6 @@ fn resolve_ref(spec :: jv.Json, _root :: jv.Json) -> Option[Str] {
 }
 
 fn extract_ref_name(path :: Str) -> Option[Str] {
-  # "#/$defs/IdToken" → "IdToken"
-  # "#/definitions/IdToken" → "IdToken"
   let parts := str.split(path, "/")
   let last := list.fold(parts, "",
     fn (acc :: Str, seg :: Str) -> Str { seg })
@@ -455,11 +420,6 @@ fn max_len_check(spec :: jv.Json) -> List[Str] {
   }
 }
 
-# Regex `pattern` constraint. The pattern string is emitted as a
-# Lex string literal verbatim — backslashes are NOT escaped because
-# they're already correctly encoded by `jv.parse` (`"\\d+"` in
-# JSON came in as `\d+` after parsing). The escape we DO add is for
-# embedded double quotes in the pattern.
 fn pattern_check(spec :: jv.Json) -> List[Str] {
   match jv.get_field(spec, "pattern") {
     None      => [],
@@ -471,11 +431,6 @@ fn pattern_check(spec :: jv.Json) -> List[Str] {
   }
 }
 
-# Map a JSON Schema `format` keyword to the matching lex-schema
-# string constraint. JSON Schema 2020-12 defines a long list; we
-# cover the ones lex-schema's `StrCheck` ADT has constructors for.
-# Unknown formats are silently dropped (the spec says validators
-# MAY treat unknown formats as no-ops).
 fn format_check(spec :: jv.Json) -> List[Str] {
   match jv.get_field(spec, "format") {
     None      => [],
@@ -520,10 +475,10 @@ fn emit_int_checks(spec :: jv.Json) -> Str {
   match (lo_o, hi_o) {
     (Some(lo), Some(hi)) => str.concat("[IntInRange(",
       str.concat(int.to_str(lo),
-        str.concat(", ", str.concat(int.to_str(hi), ")]"))))  ,
+        str.concat(", ", str.concat(int.to_str(hi), ")]"))))),
     (Some(lo), None) => if lo == 0 { "[IntNonNegative]" }
       else { str.concat("[IntMin(", str.concat(int.to_str(lo), ")]")) },
-    (None, Some(hi)) => str.concat("[IntMax(", str.concat(int.to_str(hi), ")]"))),
+    (None, Some(hi)) => str.concat("[IntMax(", str.concat(int.to_str(hi), ")]")) ,
     _ => "[]",
   }
 }
@@ -570,8 +525,6 @@ fn list_contains(xs :: List[Str], target :: Str) -> Bool {
     })
 }
 
-# Escape a Str for embedding as a Lex string literal source.
-# We escape `"` and `\` so the resulting fragment parses cleanly.
 fn escape_str_literal(s :: Str) -> Str {
   let chars := str.split(s, "")
   list.fold(chars, "",
