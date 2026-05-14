@@ -1,10 +1,4 @@
 # lex-ocpp — tests for the JSON Schema → Lex codegen
-#
-# These tests pin the generator's output for a handful of canonical
-# input shapes (primitive fields, required/optional, enum, array,
-# integer range). Tightening one of these tests after a generator
-# change is the signal to update both the generator and any
-# downstream callers.
 
 import "std.str"  as str
 import "std.list" as list
@@ -22,18 +16,11 @@ fn assert_contains(haystack :: Str, needle :: Str, label :: Str) -> Result[Unit,
     str.concat(": output missing `", str.concat(needle, "`")))) }
 }
 
-fn assert_ok_str(r :: Result[Str, Str], label :: Str) -> Result[Str, Str] {
-  match r {
-    Ok(s)  => Ok(s),
-    Err(e) => Err(str.concat(label, str.concat(": ", e))),
-  }
-}
-
 # ---- Tests ------------------------------------------------------
 
 fn test_minimal_object() -> Result[Unit, Str] {
   let schema := str.concat("{\"title\":\"Empty\",\"type\":\"object\",",
-    "\"required\":[],\"properties\":{}}") 
+    "\"required\":[],\"properties\":{}}")  
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => {
@@ -148,10 +135,6 @@ fn test_invalid_json() -> Result[Unit, Str] {
   }
 }
 
-# ============================================================
-# Extensions in v0.3 (#1) — $ref, oneOf, pattern, format hints
-# ============================================================
-
 fn test_pattern_constraint() -> Result[Unit, Str] {
   let schema :=
     str.concat("{\"title\":\"Phone\",\"type\":\"object\",",
@@ -244,7 +227,7 @@ fn test_ref_in_array_items() -> Result[Unit, Str] {
             str.concat("\"required\":[\"items\"],",
               str.concat("\"properties\":{\"items\":{\"type\":\"array\",",
                 str.concat("\"items\":{\"$ref\":\"#/$defs/Item\"},",
-                  "\"minItems\":1}}}")))))))
+                  "\"minItems\":1}}}")))))))  
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => assert_contains(src, "KObject(item_schema())", "array of $refs"),
