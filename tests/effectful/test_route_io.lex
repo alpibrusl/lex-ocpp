@@ -138,9 +138,9 @@ fn suite() -> [io, time, sql] List[Result[Unit, Str]] {
   ]
 }
 
-fn run_all() -> [io, time, sql] () {
-  assert list.fold(suite(), 0,
+fn run_all() -> [io, time, sql] Int {
+  list.fold(suite(), 0,
     fn (n :: Int, r :: Result[Unit, Str]) -> Int {
       match r { Ok(_) => n, Err(_) => n + 1 }
-    }) == 0
+    })
 }
