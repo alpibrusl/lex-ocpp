@@ -57,13 +57,17 @@ jobs:
         working-directory: lex-ocpp
         run: lex pkg install
 
-      # Type-check both public entry points; imports are traced
-      # transitively so this covers all of src/.
-      - name: Type-check src/ (strict)
+      # Pure entry point: covers messages.lex, route.lex, error.lex
+      # and all their transitive imports.
+      - name: Type-check charge_point.lex (strict)
         working-directory: lex-ocpp
-        run: |
-          lex check --strict src/charge_point.lex
-          lex check --strict src/charge_point_io.lex
+        run: lex check --strict src/charge_point.lex
+
+      # Effectful entry point: additionally covers route_io.lex and
+      # the new net.dial_ws-based dial[E] function.
+      - name: Type-check charge_point_io.lex (strict)
+        working-directory: lex-ocpp
+        run: lex check --strict src/charge_point_io.lex
 
       # Run pure test suite (tests/test_*.lex at top level).
       # 0.9.3 permissive-policy fix (#399) means sql/random effects
