@@ -177,7 +177,34 @@ examples/
   csms_v201.lex           v2.0.1 CSMS over WebSocket
   csms_v21.lex            (v0.3) v2.1 CSMS — DER / battery swap / streams
   charger_frames.lex      Frame construction demo (no transport)
+  cp_simulator_v16.lex    (v0.4) Charge-point simulator — dials a CSMS
+                          over `ws://`, replays a full session
 ```
+
+### Real-world simulator pair
+
+For an end-to-end demo on a single host, run the CSMS in one terminal
+and the charge-point simulator in another:
+
+```sh
+# Terminal A — Central System
+lex run --allow-effects net,io,time examples/csms_v16.lex main
+
+# Terminal B — Charge point connecting to the CSMS above
+lex run --allow-effects net,io examples/cp_simulator_v16.lex main
+```
+
+The simulator opens a WebSocket to `ws://localhost:9000/ocpp/SIM-CP-001`
+and walks the canonical OCPP 1.6 session (BootNotification →
+StatusNotification → Authorize → StartTransaction → MeterValues →
+Heartbeat → StopTransaction → StatusNotification). Because the
+`on_open` / `on_message` callbacks are stateless, the session state
+machine lives in the OCPP message-id strings: the CSMS echoes each id
+back in its CallResult, and `cp_simulator_v16.on_result` looks at the
+id to choose the next Call. The `transactionId` returned by
+StartTransaction is threaded through subsequent message-ids
+(`meter:tx42`, `heartbeat:tx42`, `stop:tx42`) so StopTransaction can
+recover it without shared state.
 
 ## Design
 
