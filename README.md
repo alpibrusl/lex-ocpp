@@ -177,7 +177,113 @@ examples/
   csms_v201.lex           v2.0.1 CSMS over WebSocket
   csms_v21.lex            (v0.3) v2.1 CSMS — DER / battery swap / streams
   charger_frames.lex      Frame construction demo (no transport)
+  cp_simulator_v16.lex    (v0.4) Charge-point simulator — dials a CSMS
+                          over `ws://`, replays a full session;
+                          CP_ID / ID_TAG come from env vars for multi-CP
+  csms_v16_sqlite.lex     (v0.4) CSMS over `ws://` with SQLite
+                          persistence — real `transactionId` from
+                          AUTOINCREMENT, idTag allowlist, per-CP
+                          audit trail
+  cp_simulator_v21.lex    (v0.4) OCPP 2.1 charge-point simulator —
+                          dials csms_v21.lex over `ws://`, walks the
+                          v2.1 TransactionEvent state machine
+                          (Started → Updated → Ended)
 ```
+
+### Real-world simulator pair
+
+For an end-to-end demo on a single host, run a CSMS in one terminal
+and one or more charge-point simulators in others.
+
+**Minimal** (pure handlers, no persistence — fast to read, no `[sql]`):
+
+```sh
+# Terminal A — Central System
+lex run --allow-effects net,io,time examples/csms_v16.lex main
+
+# Terminal B — Charge point connecting to the CSMS above
+lex run --allow-effects net,io,env examples/cp_simulator_v16.lex main
+```
+
+**Stateful + multi-CP** (SQLite persistence; two simulators in parallel):
+
+```sh
+# Terminal A — CSMS, writes to /tmp/csms.db (override with $CSMS_DB)
+lex run --allow-effects net,io,time,sql,fs_write,env \
+  examples/csms_v16_sqlite.lex main
+
+# Terminal B — Authorized charge point (USER-001 is pre-seeded in
+# `allowed_tags`; the session completes end-to-end)
+CP_ID=CP-001 ID_TAG=USER-001 \
+  lex run --allow-effects net,io,env \
+  examples/cp_simulator_v16.lex main
+
+# Terminal C — Unauthorized charge point (CSMS rejects at Authorize;
+# the simulator aborts before sending StartTransaction)
+CP_ID=CP-002 ID_TAG=UNKNOWN-CARD \
+  lex run --allow-effects net,io,env \
+  examples/cp_simulator_v16.lex main
+```
+
+Inspect the run:
+
+```sh
+sqlite3 /tmp/csms.db <<SQL
+.headers on
+SELECT id, cp_id, id_tag, meter_start, meter_stop, reason FROM transactions;
+SELECT cp_id, transaction_id, value_wh, ts FROM meter_values;
+SELECT cp_id, status, ts FROM status_log ORDER BY id;
+SQL
+```
+
+Both example simulators open a WebSocket to
+`ws://localhost:9000/ocpp/<CP_ID>` and walk the canonical OCPP 1.6
+session (BootNotification → StatusNotification → Authorize →
+StartTransaction → MeterValues → Heartbeat → StopTransaction →
+StatusNotification). The `on_open` / `on_message` callbacks are
+stateless (Lex has no mutable globals), so the session state machine
+lives in the OCPP message-id strings: the CSMS echoes each id back in
+its CallResult, and `cp_simulator_v16.on_result` looks at the id to
+choose the next Call. The `transactionId` returned by
+StartTransaction is threaded through subsequent message-ids
+(`meter:tx<N>`, `heartbeat:tx<N>`, `stop:tx<N>`) so StopTransaction
+can recover it without shared state.
+
+`csms_v16_sqlite.lex` bypasses the route_io registry pattern
+deliberately: the registry dispatches purely on action name and can't
+see `WsConn`, but the CSMS needs `WsConn.path` to derive `cp_id`. So
+it builds dispatch directly on top of `msg.*`, `sch.validate_*`, and
+`route.HandlerResult`, and captures the `Db` handle through a
+closure passed to `net.serve_ws_fn`.
+
+**OCPP 2.1**: a sibling `cp_simulator_v21.lex` pairs with
+`examples/csms_v21.lex` (subprotocol `ocpp2.1`, port 9002) and
+exercises the v2.1-specific message shapes:
+
+```sh
+# Terminal A — OCPP 2.1 CSMS
+lex run --allow-effects net,io,time examples/csms_v21.lex main
+
+# Terminal B — OCPP 2.1 charge point
+CP_ID=CS-001 ID_TOKEN=USER-001 \
+  lex run --allow-effects net,io,env examples/cp_simulator_v21.lex main
+```
+
+The v2.1 script walks `BootNotification(reason=PowerUp)` →
+`StatusNotification(connectorStatus=Available, evseId, connectorId)` →
+`Authorize(idToken={idToken, type=ISO14443})` →
+**`TransactionEvent`** (which replaces v1.6's Start/Stop pair —
+`eventType` in {Started, Updated, Ended}, monotonic `seqNo`, and the
+CP picks the string `transactionId`) → `Heartbeat` → final
+`TransactionEvent(Ended, stoppedReason=Local)` → another
+`StatusNotification(Available)`. The schema differences from v1.6
+that bit during development:
+
+- `sampledValue.value` is a JSON number in 2.1 (was a string in 1.6).
+- `Authorize` takes an `idToken` *record* (`{idToken, type}`), not a
+  bare `idTag` string; response key is `idTokenInfo`, not `idTagInfo`.
+- `BootNotification.chargingStation` carries `vendorName` / `model`
+  (replacing `chargePointVendor` / `chargePointModel`).
 
 ## Design
 
