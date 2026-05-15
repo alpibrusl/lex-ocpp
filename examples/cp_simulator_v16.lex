@@ -55,6 +55,7 @@ import "std.net"  as net
 import "std.str"  as str
 import "std.int"  as int
 import "std.list" as list
+import "std.env"  as env
 
 import "lex-schema/json_value" as jv
 
@@ -63,11 +64,41 @@ import "../src/charge_point"  as cp
 import "../src/v16/enums"     as en
 
 # ---- Configuration -----------------------------------------------
+#
+# `CP_ID` and `ID_TAG` come from the environment so multiple
+# simulator processes can dial the same CSMS with distinct identities:
+#
+#   CP_ID=CP-001 ID_TAG=USER-001 lex run ... examples/cp_simulator_v16.lex main
+#   CP_ID=CP-002 ID_TAG=USER-002 lex run ... examples/cp_simulator_v16.lex main
+#
+# Defaults preserve the single-CP run-and-go behaviour for users who
+# just want to point a simulator at csms_v16.lex without setting env.
 
-fn csms_url() -> Str { "ws://localhost:9000/ocpp/SIM-CP-001" }
-fn vendor()   -> Str { "ACME" }
-fn model()    -> Str { "Model-X-Sim" }
-fn id_tag()   -> Str { "USER-001" }
+fn default_cp_id() -> Str { "SIM-CP-001" }
+fn default_id_tag() -> Str { "USER-001" }
+
+# Snapshot of the per-process identity, read once in `main` from env
+# and threaded through every frame builder. Keeping it as a record
+# (rather than a `()->[env]` lookup at each call site) means the
+# `on_open` / `on_message` closures only need `[io]`, not `[io, env]`,
+# which keeps dial_ws's effect row clean.
+type Config = {
+  cp_id  :: Str,
+  id_tag :: Str,
+}
+
+fn config_from_env() -> [env] Config {
+  let cp := match env.get("CP_ID") { Some(v) => v, None => default_cp_id() }
+  let it := match env.get("ID_TAG") { Some(v) => v, None => default_id_tag() }
+  { cp_id: cp, id_tag: it }
+}
+
+fn csms_url_for(cp :: Str) -> Str {
+  str.concat("ws://localhost:9000/ocpp/", cp)
+}
+
+fn vendor() -> Str { "ACME" }
+fn model()  -> Str { "Model-X-Sim" }
 fn connector_id() -> Int { 1 }
 fn meter_start_wh() -> Int { 0 }
 fn meter_stop_wh()  -> Int { 15000 }
@@ -99,27 +130,30 @@ fn status_call(mid :: Str, status :: Str) -> Str {
     ])))
 }
 
-fn authorize_call(mid :: Str) -> Str {
+fn authorize_call(mid :: Str, id_tag :: Str) -> Str {
   msg.encode(msg.new_call(mid, "Authorize",
-    JObj([("idTag", JStr(id_tag()))])))
+    JObj([("idTag", JStr(id_tag))])))
 }
 
-fn start_call(mid :: Str) -> Str {
+fn start_call(mid :: Str, id_tag :: Str) -> Str {
   msg.encode(msg.new_call(mid, "StartTransaction",
     JObj([
       ("connectorId", JInt(connector_id())),
-      ("idTag",       JStr(id_tag())),
+      ("idTag",       JStr(id_tag)),
       ("meterStart",  JInt(meter_start_wh())),
       ("timestamp",   JStr(ts_start())),
     ])))
 }
 
-fn meter_call(mid :: Str) -> Str {
+fn meter_call(mid :: Str, tx_id :: Int) -> Str {
   # The "value" field in MeterValues / SampledValue is wire-typed as
   # a Str in OCPP 1.6 (not an Int) — render the integer accordingly.
+  # `transactionId` is optional in OCPP 1.6 MeterValues; including it
+  # lets a stateful CSMS correlate the row with the right transaction.
   msg.encode(msg.new_call(mid, "MeterValues",
     JObj([
-      ("connectorId", JInt(connector_id())),
+      ("connectorId",   JInt(connector_id())),
+      ("transactionId", JInt(tx_id)),
       ("meterValue",  JList([
         JObj([
           ("timestamp",    JStr(ts_sample())),
@@ -176,26 +210,14 @@ fn on_open() -> [io] WsAction {
   WsSend(boot_call(step_boot()))
 }
 
-fn on_message(m :: WsMessage) -> [io] WsAction {
-  match m {
-    WsText(raw) => on_text(raw),
-    WsClose     => {
-      let _ := io.print("<- server closed connection")
-      WsNoOp
-    },
-    WsPing      => WsNoOp,
-    WsBinary(_) => WsNoOp,
-  }
-}
-
-fn on_text(raw :: Str) -> [io] WsAction {
+fn on_text(raw :: Str, id_tag :: Str) -> [io] WsAction {
   let _ := io.print(str.concat("← ", raw))
   match msg.parse(raw) {
     Err(fe) => {
       let _ := io.print(str.concat("! parse error: ", fe.message))
       WsNoOp
     },
-    Ok(FrameCallResult(r)) => on_result(r.message_id, r.payload),
+    Ok(FrameCallResult(r)) => on_result(r.message_id, r.payload, id_tag),
     Ok(FrameCallError(e))  => {
       let _ := io.print(str.concat("! CallError ",
         str.concat(e.error_code, str.concat(": ", e.description))))
@@ -213,18 +235,25 @@ fn on_text(raw :: Str) -> [io] WsAction {
 
 # Decide the next outbound Call from the inbound CallResult's
 # message_id. Unrecognised IDs end the session (WsNoOp).
-fn on_result(mid :: Str, payload :: jv.Json) -> [io] WsAction {
+fn on_result(mid :: Str, payload :: jv.Json, id_tag :: Str) -> [io] WsAction {
   if mid == step_boot() {
     emit("StatusNotification(Available)", status_call(step_status_init(),
       en.cp_available()))
   } else { if mid == step_status_init() {
-    emit("Authorize", authorize_call(step_auth()))
+    emit("Authorize", authorize_call(step_auth(), id_tag))
   } else { if mid == step_auth() {
-    emit("StartTransaction", start_call(step_start()))
+    if authorize_accepted(payload) {
+      emit("StartTransaction", start_call(step_start(), id_tag))
+    } else {
+      let _ := io.print(str.concat(
+        "× Authorize rejected; session aborts. idTagInfo: ",
+        jv.stringify(payload)))
+      WsNoOp
+    }
   } else { if mid == step_start() {
     # Extract transactionId from the StartTransaction response.
     let tx := tx_id_from(payload)
-    emit("MeterValues", meter_call(step_meter(tx)))
+    emit("MeterValues", meter_call(step_meter(tx), tx))
   } else {
     on_result_tx(mid)
   } } } }
@@ -267,6 +296,18 @@ fn tx_id_from(payload :: jv.Json) -> Int {
   }
 }
 
+# Authorize response is `{"idTagInfo":{"status":"Accepted"|"Invalid"|...}}`.
+# Only "Accepted" lets the CP proceed to StartTransaction.
+fn authorize_accepted(payload :: jv.Json) -> Bool {
+  match jv.get_field(payload, "idTagInfo") {
+    Some(info) => match jv.get_field(info, "status") {
+      Some(JStr(s)) => s == en.auth_accepted(),
+      _             => false,
+    },
+    None => false,
+  }
+}
+
 # Recover the numeric tx suffix from an id like "meter:tx42".
 # Returns 0 on unexpected shape — caller treats that as a noop step.
 fn tx_from_step_id(mid :: Str) -> Int {
@@ -294,10 +335,30 @@ fn starts_with(s :: Str, prefix :: Str) -> Bool {
 
 # ---- Entry point -------------------------------------------------
 
-fn main() -> [net, io] Nil {
-  let _ := io.print(str.concat("=== cp_simulator_v16 → ", csms_url()))
+fn make_on_message(
+  id_tag :: Str
+) -> (WsMessage) -> [io] WsAction {
+  fn (m :: WsMessage) -> [io] WsAction {
+    match m {
+      WsText(raw) => on_text(raw, id_tag),
+      WsClose     => {
+        let _ := io.print("<- server closed connection")
+        WsNoOp
+      },
+      WsPing      => WsNoOp,
+      WsBinary(_) => WsNoOp,
+    }
+  }
+}
+
+fn main() -> [net, io, env] Nil {
+  let cfg := config_from_env()
+  let url := csms_url_for(cfg.cp_id)
+  let _ := io.print(str.concat("=== cp_simulator_v16 [", str.concat(cfg.cp_id,
+            str.concat("] → ", url))))
   let _ := io.print(str.concat("    subprotocol: ", cp.version_v16()))
-  match net.dial_ws(csms_url(), cp.version_v16(), on_open, on_message) {
+  let _ := io.print(str.concat("    id_tag: ",      cfg.id_tag))
+  match net.dial_ws(url, cp.version_v16(), on_open, make_on_message(cfg.id_tag)) {
     Ok(_)  => io.print("dial finished cleanly"),
     Err(e) => io.print(str.concat("dial failed: ", e)),
   }
