@@ -1,12 +1,4 @@
 # lex-ocpp — OCPP 2.1 schema validation tests
-#
-# Two halves:
-#   1. Carry-overs from 2.0.1 with v2.1 enum coverage (e.g. v2.1's
-#      `Discharging` charging state, new `VIN` / `ISO15118v20`
-#      idToken types).
-#   2. v2.1-additions: BatterySwap, NotifyAllowedEnergyTransfer,
-#      periodic event streams, DER control, dynamic schedule,
-#      web payment, priority charging, tariff change.
 
 import "std.str"  as str
 import "std.list" as list
@@ -119,7 +111,7 @@ fn test_battery_swap_bad_soc() -> Result[Unit, Str] {
   let battery := JObj([
     ("evseId",       JInt(1)),
     ("serialNumber", JStr("BAT-001-A")),
-    ("soC",          JFloat(150.0)),    # > 100 — should fail
+    ("soC",          JFloat(150.0)),
     ("soH",          JFloat(96.0)),
   ])
   let token := JObj([
@@ -171,7 +163,7 @@ fn test_open_periodic_event_stream_ok() -> Result[Unit, Str] {
 
 fn test_open_periodic_event_stream_too_big_interval() -> Result[Unit, Str] {
   let params := JObj([
-    ("interval", JInt(86401)),                  # > 24h cap
+    ("interval", JInt(86401)),
     ("values",   JInt(50)),
   ])
   assert_err_validation(
@@ -322,9 +314,9 @@ fn suite() -> List[Result[Unit, Str]] {
   ]
 }
 
-fn run_all() -> Int {
-  list.fold(suite(), 0,
+fn run_all() -> () {
+  assert list.fold(suite(), 0,
     fn (n :: Int, r :: Result[Unit, Str]) -> Int {
       match r { Ok(_) => n, Err(_) => n + 1 }
-    })
+    }) == 0
 }

@@ -78,7 +78,6 @@ fn test_dispatch_handler_can_return_error() -> Result[Unit, Str] {
 fn test_dispatch_with_schema_rejects_bad_payload() -> Result[Unit, Str] {
   let reg := route.handler_with_schema(route.new(),
     "Authorize", require_id_tag, echo_handler)
-  # Payload missing idTag — validator should reject.
   let resp := route.dispatch(reg,
     msg.new_call("42", "Authorize", JObj([])))
   match resp {
@@ -151,9 +150,9 @@ fn suite() -> List[Result[Unit, Str]] {
   ]
 }
 
-fn run_all() -> Int {
-  list.fold(suite(), 0,
+fn run_all() -> () {
+  assert list.fold(suite(), 0,
     fn (n :: Int, r :: Result[Unit, Str]) -> Int {
       match r { Ok(_) => n, Err(_) => n + 1 }
-    })
+    }) == 0
 }

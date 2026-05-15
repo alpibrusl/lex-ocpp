@@ -32,6 +32,7 @@
 
 import "std.io"   as io
 import "std.net"  as net
+import "std.str"  as str
 import "std.list" as list
 
 import "lex-schema/json_value" as jv
@@ -186,9 +187,9 @@ fn main() -> [net, io, time] Nil {
 }
 
 fn describe_routes() -> Str {
-  "registered actions: " +
+  str.concat("registered actions: ",
     list.fold(cp.actions(central_system()), "",
       fn (acc :: Str, action :: Str) -> Str {
-        if acc == "" { action } else { acc + ", " + action }
-      })
+        if acc == "" { action } else { str.concat(acc, str.concat(", ", action)) }
+      }))
 }

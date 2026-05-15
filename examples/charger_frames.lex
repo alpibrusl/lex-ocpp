@@ -1,9 +1,10 @@
-# lex-ocpp example — charger-side frame construction (no transport)
+# lex-ocpp example -- charger-side frame construction (no transport)
 #
-# lex-lang ships a WebSocket *server* (`net.serve_ws_fn`) but not yet
-# a client, so this example focuses on the charger half of the
-# protocol that doesn't need network access: building the frames a
-# charge point would send to a CSMS.
+# Demonstrates the pure half of the OCPP charge-point role: building
+# the wire frames a charge point sends to a CSMS. No network effects
+# are needed here -- for a full outbound connection use
+# `cp_io.dial(cp, "wss://csms.example.com/ocpp/CP001", on_open, on_msg)`
+# (requires lex-lang 0.9.3+ for net.dial_ws).
 #
 # Pipe the printed frames into a `wscat` session against the CSMS in
 # examples/csms_v16.lex to drive a real session.

@@ -16,7 +16,6 @@
 # look up an idTag in the DB before passing to the handler), wire
 # that into the handler body, not the validator.
 
-import "std.str"  as str
 import "std.list" as list
 
 import "lex-schema/json_value" as jv
