@@ -1,0 +1,7 @@
+# Lex build / CLI artefacts
+.cli/
+.lex-store/
+
+# Editor / OS junk
+.DS_Store
+*.swp

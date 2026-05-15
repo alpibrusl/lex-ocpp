@@ -184,6 +184,10 @@ examples/
                           persistence — real `transactionId` from
                           AUTOINCREMENT, idTag allowlist, per-CP
                           audit trail
+  cp_simulator_v21.lex    (v0.4) OCPP 2.1 charge-point simulator —
+                          dials csms_v21.lex over `ws://`, walks the
+                          v2.1 TransactionEvent state machine
+                          (Started → Updated → Ended)
 ```
 
 ### Real-world simulator pair
@@ -251,6 +255,35 @@ see `WsConn`, but the CSMS needs `WsConn.path` to derive `cp_id`. So
 it builds dispatch directly on top of `msg.*`, `sch.validate_*`, and
 `route.HandlerResult`, and captures the `Db` handle through a
 closure passed to `net.serve_ws_fn`.
+
+**OCPP 2.1**: a sibling `cp_simulator_v21.lex` pairs with
+`examples/csms_v21.lex` (subprotocol `ocpp2.1`, port 9002) and
+exercises the v2.1-specific message shapes:
+
+```sh
+# Terminal A — OCPP 2.1 CSMS
+lex run --allow-effects net,io,time examples/csms_v21.lex main
+
+# Terminal B — OCPP 2.1 charge point
+CP_ID=CS-001 ID_TOKEN=USER-001 \
+  lex run --allow-effects net,io,env examples/cp_simulator_v21.lex main
+```
+
+The v2.1 script walks `BootNotification(reason=PowerUp)` →
+`StatusNotification(connectorStatus=Available, evseId, connectorId)` →
+`Authorize(idToken={idToken, type=ISO14443})` →
+**`TransactionEvent`** (which replaces v1.6's Start/Stop pair —
+`eventType` in {Started, Updated, Ended}, monotonic `seqNo`, and the
+CP picks the string `transactionId`) → `Heartbeat` → final
+`TransactionEvent(Ended, stoppedReason=Local)` → another
+`StatusNotification(Available)`. The schema differences from v1.6
+that bit during development:
+
+- `sampledValue.value` is a JSON number in 2.1 (was a string in 1.6).
+- `Authorize` takes an `idToken` *record* (`{idToken, type}`), not a
+  bare `idTag` string; response key is `idTokenInfo`, not `idTagInfo`.
+- `BootNotification.chargingStation` carries `vendorName` / `model`
+  (replacing `chargePointVendor` / `chargePointModel`).
 
 ## Design
 
