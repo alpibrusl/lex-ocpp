@@ -518,3 +518,7 @@ that need persistence.
 ## License
 
 [EUPL-1.2](LICENSE) — to match the parent lex-lang ecosystem.
+
+---
+
+Built under the principles of [Trust Without Comprehension](https://alpibru.com/manifesto).

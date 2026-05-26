@@ -320,7 +320,7 @@ fn emit_array_field(name :: Str, spec :: jv.Json, root :: jv.Json) -> Str {
     None              => "KStr([])",
     Some(items_spec)  => match resolve_ref(items_spec, root) {
       Some(ref_name) => str.concat("KObject(",
-        str.concat(snake_case(ref_name), "_schema())"))
+        str.concat(snake_case(ref_name), "_schema())")),
       None => match field_str_or(items_spec, "type", "string") {
         "string"  => str.concat("KStr(", str.concat(emit_str_checks(items_spec), ")")),
         "integer" => str.concat("KInt(", str.concat(emit_int_checks(items_spec), ")")),

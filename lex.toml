@@ -14,3 +14,4 @@ lex     = "0.9.3"
 [dependencies]
 lex-schema = { path = "../lex-schema" }
 lex-crypto = { git = "https://github.com/alpibrusl/lex-crypto" }
+lex-web    = { path = "../lex-web" }

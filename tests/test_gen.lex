@@ -73,7 +73,7 @@ fn test_enum_constraint() -> Result[Unit, Str] {
       str.concat("\"required\":[\"value\"],",
         str.concat("\"properties\":{",
           str.concat("\"value\":{\"type\":\"string\",",
-            "\"enum\":[\"Accepted\",\"Pending\",\"Rejected\"]}}}")))
+            "\"enum\":[\"Accepted\",\"Pending\",\"Rejected\"]}}}"))))
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => assert_contains(src,
@@ -314,9 +314,9 @@ fn suite() -> List[Result[Unit, Str]] {
   ]
 }
 
-fn run_all() -> () {
-  assert list.fold(suite(), 0,
+fn run_all() -> Int {
+  list.fold(suite(), 0,
     fn (n :: Int, r :: Result[Unit, Str]) -> Int {
       match r { Ok(_) => n, Err(_) => n + 1 }
-    }) == 0
+    })
 }
