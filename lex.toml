@@ -1,7 +1,7 @@
 [package]
 name    = "lex-ocpp"
 version = "0.1.0"
-lex     = "0.9.3"
+lex     = "0.9.7"
 
 # OCPP (Open Charge Point Protocol) library for lex-lang.
 # Inspired by https://github.com/mobilityhouse/ocpp — same shape
