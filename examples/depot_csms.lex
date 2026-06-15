@@ -22,105 +22,90 @@
 #   sqlite3 /tmp/depot.db \
 #     'SELECT cp_id, id_tag, meter_stop - meter_start AS wh FROM transactions;'
 
-import "std.io"   as io
-import "std.net"  as net
-import "std.str"  as str
-import "std.int"  as int
+import "std.io" as io
+
+import "std.net" as net
+
+import "std.str" as str
+
+import "std.int" as int
+
 import "std.list" as list
-import "std.sql"  as sql
-import "std.env"  as env
+
+import "std.sql" as sql
+
+import "std.env" as env
+
 import "std.time" as time
 
 import "lex-schema/json_value" as jv
-import "lex-web/ws"            as ws   # last_segment, send, noop helpers
 
-import "../src/messages"     as msg
-import "../src/error"        as oe
-import "../src/route"        as route
+import "lex-web/ws" as ws
+
+# last_segment, send, noop helpers
+import "../src/messages" as msg
+
+import "../src/error" as oe
+
+import "../src/route" as route
+
 import "../src/charge_point" as cp
-import "../src/v16/action"   as a
-import "../src/v16/enums"    as en
-import "../src/v16/schemas"  as sch
+
+import "../src/v16/action" as a
+
+import "../src/v16/enums" as en
+
+import "../src/v16/schemas" as sch
 
 # ---- Configuration -----------------------------------------------
-
-fn default_db_path() -> Str { "/tmp/depot.db" }
+fn default_db_path() -> Str {
+  "/tmp/depot.db"
+}
 
 fn db_path() -> [env] Str {
   match env.get("CSMS_DB") {
     Some(p) => p,
-    None    => default_db_path(),
+    None => default_db_path(),
   }
 }
 
-fn boot_interval_s() -> Int { 300 }
+fn boot_interval_s() -> Int {
+  300
+}
 
 # ---- Schema -------------------------------------------------------
-
 fn ddl_charge_points() -> Str {
-  "CREATE TABLE IF NOT EXISTS charge_points (
-     cp_id      TEXT PRIMARY KEY,
-     vendor     TEXT,
-     model      TEXT,
-     last_boot  TEXT
-   )"
+  "CREATE TABLE IF NOT EXISTS charge_points (\n     cp_id      TEXT PRIMARY KEY,\n     vendor     TEXT,\n     model      TEXT,\n     last_boot  TEXT\n   )"
 }
 
 fn ddl_allowed_tags() -> Str {
-  "CREATE TABLE IF NOT EXISTS allowed_tags (
-     id_tag      TEXT PRIMARY KEY,
-     description TEXT
-   )"
+  "CREATE TABLE IF NOT EXISTS allowed_tags (\n     id_tag      TEXT PRIMARY KEY,\n     description TEXT\n   )"
 }
 
 fn ddl_transactions() -> Str {
-  "CREATE TABLE IF NOT EXISTS transactions (
-     id           INTEGER PRIMARY KEY AUTOINCREMENT,
-     cp_id        TEXT NOT NULL,
-     connector_id INTEGER NOT NULL,
-     id_tag       TEXT NOT NULL,
-     meter_start  INTEGER NOT NULL,
-     meter_stop   INTEGER,
-     start_ts     TEXT NOT NULL,
-     stop_ts      TEXT,
-     reason       TEXT
-   )"
+  "CREATE TABLE IF NOT EXISTS transactions (\n     id           INTEGER PRIMARY KEY AUTOINCREMENT,\n     cp_id        TEXT NOT NULL,\n     connector_id INTEGER NOT NULL,\n     id_tag       TEXT NOT NULL,\n     meter_start  INTEGER NOT NULL,\n     meter_stop   INTEGER,\n     start_ts     TEXT NOT NULL,\n     stop_ts      TEXT,\n     reason       TEXT\n   )"
 }
 
 fn ddl_meter_values() -> Str {
-  "CREATE TABLE IF NOT EXISTS meter_values (
-     id             INTEGER PRIMARY KEY AUTOINCREMENT,
-     cp_id          TEXT NOT NULL,
-     transaction_id INTEGER,
-     connector_id   INTEGER NOT NULL,
-     value_wh       INTEGER NOT NULL,
-     ts             TEXT NOT NULL
-   )"
+  "CREATE TABLE IF NOT EXISTS meter_values (\n     id             INTEGER PRIMARY KEY AUTOINCREMENT,\n     cp_id          TEXT NOT NULL,\n     transaction_id INTEGER,\n     connector_id   INTEGER NOT NULL,\n     value_wh       INTEGER NOT NULL,\n     ts             TEXT NOT NULL\n   )"
 }
 
 fn ddl_status_log() -> Str {
-  "CREATE TABLE IF NOT EXISTS status_log (
-     id           INTEGER PRIMARY KEY AUTOINCREMENT,
-     cp_id        TEXT NOT NULL,
-     connector_id INTEGER,
-     status       TEXT NOT NULL,
-     error_code   TEXT,
-     ts           TEXT NOT NULL
-   )"
+  "CREATE TABLE IF NOT EXISTS status_log (\n     id           INTEGER PRIMARY KEY AUTOINCREMENT,\n     cp_id        TEXT NOT NULL,\n     connector_id INTEGER,\n     status       TEXT NOT NULL,\n     error_code   TEXT,\n     ts           TEXT NOT NULL\n   )"
 }
 
 fn init_db(db :: Db) -> [sql] Result[Unit, SqlError] {
   match sql.exec(db, ddl_charge_points(), []) {
     Err(e) => Err(e),
-    Ok(_)  => match sql.exec(db, ddl_allowed_tags(), []) {
+    Ok(_) => match sql.exec(db, ddl_allowed_tags(), []) {
       Err(e) => Err(e),
-      Ok(_)  => match sql.exec(db, ddl_transactions(), []) {
+      Ok(_) => match sql.exec(db, ddl_transactions(), []) {
         Err(e) => Err(e),
-        Ok(_)  => match sql.exec(db, ddl_meter_values(), []) {
+        Ok(_) => match sql.exec(db, ddl_meter_values(), []) {
           Err(e) => Err(e),
-          Ok(_)  => match sql.exec(db, ddl_status_log(), []) {
+          Ok(_) => match sql.exec(db, ddl_status_log(), []) {
             Err(e) => Err(e),
-            Ok(_)  => seed_depot_tags(db, depot_tag_list()),
+            Ok(_) => seed_depot_tags(db, depot_tag_list()),
           },
         },
       },
@@ -129,91 +114,58 @@ fn init_db(db :: Db) -> [sql] Result[Unit, SqlError] {
 }
 
 # ---- Tag seeding -------------------------------------------------
-
 fn depot_tag_list() -> List[Str] {
-  ["USER-001", "USER-002", "USER-003", "USER-004", "USER-005",
-   "USER-006", "USER-007", "USER-008", "USER-009", "USER-010"]
+  ["USER-001", "USER-002", "USER-003", "USER-004", "USER-005", "USER-006", "USER-007", "USER-008", "USER-009", "USER-010"]
 }
 
 fn seed_depot_tags(db :: Db, tags :: List[Str]) -> [sql] Result[Unit, SqlError] {
   match list.head(tags) {
     None => Ok(()),
-    Some(tag) =>
-      match sql.exec(db,
-        "INSERT OR IGNORE INTO allowed_tags (id_tag, description) VALUES (?, ?)",
-        [PStr(tag), PStr("depot driver card")])
-      {
-        Err(e) => Err(e),
-        Ok(_)  => seed_depot_tags(db, list.tail(tags)),
-      },
+    Some(tag) => match sql.exec(db, "INSERT OR IGNORE INTO allowed_tags (id_tag, description) VALUES (?, ?)", [PStr(tag), PStr("depot driver card")]) {
+      Err(e) => Err(e),
+      Ok(_) => seed_depot_tags(db, list.tail(tags)),
+    },
   }
 }
 
 # ---- Per-action handlers -----------------------------------------
-
-fn on_boot(
-  db :: Db, cp_id :: Str, payload :: jv.Json, now :: Str
-) -> [io, sql] route.HandlerResult {
+fn on_boot(db :: Db, cp_id :: Str, payload :: jv.Json, now :: Str) -> [io, sql] route.HandlerResult {
   let vendor := json_str_or(payload, "chargePointVendor", "")
-  let model  := json_str_or(payload, "chargePointModel",  "")
-  let _ := io.print(str.concat("  [", str.concat(cp_id,
-            str.concat("] Boot vendor=",
-              str.concat(vendor, str.concat(" model=", model))))))
-  match sql.exec(db,
-    "INSERT INTO charge_points (cp_id, vendor, model, last_boot)
-       VALUES (?, ?, ?, ?)
-     ON CONFLICT(cp_id) DO UPDATE SET
-       vendor=excluded.vendor, model=excluded.model,
-       last_boot=excluded.last_boot",
-    [PStr(cp_id), PStr(vendor), PStr(model), PStr(now)])
-  {
+  let model := json_str_or(payload, "chargePointModel", "")
+  let __lex_discard_1 := io.print(str.concat("  [", str.concat(cp_id, str.concat("] Boot vendor=", str.concat(vendor, str.concat(" model=", model))))))
+  match sql.exec(db, "INSERT INTO charge_points (cp_id, vendor, model, last_boot)\n       VALUES (?, ?, ?, ?)\n     ON CONFLICT(cp_id) DO UPDATE SET\n       vendor=excluded.vendor, model=excluded.model,\n       last_boot=excluded.last_boot", [PStr(cp_id), PStr(vendor), PStr(model), PStr(now)]) {
     Err(e) => HErr(oe.internal_err(e.message)),
-    Ok(_)  => HOk(JObj([
-      ("currentTime", JStr(now)),
-      ("interval",    JInt(boot_interval_s())),
-      ("status",      JStr(en.reg_accepted())),
-    ])),
+    Ok(_) => HOk(JObj([("currentTime", JStr(now)), ("interval", JInt(boot_interval_s())), ("status", JStr(en.reg_accepted()))])),
   }
 }
 
-fn on_status(
-  db :: Db, cp_id :: Str, payload :: jv.Json, now :: Str
-) -> [io, sql] route.HandlerResult {
+fn on_status(db :: Db, cp_id :: Str, payload :: jv.Json, now :: Str) -> [io, sql] route.HandlerResult {
   let conn_id := json_int_or(payload, "connectorId", 0)
-  let status  := json_str_or(payload, "status",      "?")
-  let err_c   := json_str_or(payload, "errorCode",   en.ec_no_error())
-  let _ := io.print(str.concat("  [", str.concat(cp_id,
-            str.concat("] Status conn=", str.concat(int.to_str(conn_id),
-              str.concat(" ", status))))))
-  match sql.exec(db,
-    "INSERT INTO status_log (cp_id, connector_id, status, error_code, ts)
-       VALUES (?, ?, ?, ?, ?)",
-    [PStr(cp_id), PInt(conn_id), PStr(status), PStr(err_c), PStr(now)])
-  {
+  let status := json_str_or(payload, "status", "?")
+  let err_c := json_str_or(payload, "errorCode", en.ec_no_error())
+  let __lex_discard_2 := io.print(str.concat("  [", str.concat(cp_id, str.concat("] Status conn=", str.concat(int.to_str(conn_id), str.concat(" ", status))))))
+  match sql.exec(db, "INSERT INTO status_log (cp_id, connector_id, status, error_code, ts)\n       VALUES (?, ?, ?, ?, ?)", [PStr(cp_id), PInt(conn_id), PStr(status), PStr(err_c), PStr(now)]) {
     Err(e) => HErr(oe.internal_err(e.message)),
-    Ok(_)  => HOk(JObj([])),
+    Ok(_) => HOk(JObj([])),
   }
 }
 
-fn on_authorize(
-  db :: Db, cp_id :: Str, payload :: jv.Json, _now :: Str
-) -> [io, sql] route.HandlerResult {
-  let id_tag  := json_str_or(payload, "idTag", "")
+fn on_authorize(db :: Db, cp_id :: Str, payload :: jv.Json, _now :: Str) -> [io, sql] route.HandlerResult {
+  let id_tag := json_str_or(payload, "idTag", "")
   let allowed := tag_is_allowed(db, id_tag)
-  let status  := if allowed { en.auth_accepted() } else { en.auth_invalid() }
-  let _ := io.print(str.concat("  [", str.concat(cp_id,
-            str.concat("] Authorize idTag=", str.concat(id_tag,
-              str.concat(" -> ", status))))))
+  let status := if allowed {
+    en.auth_accepted()
+  } else {
+    en.auth_invalid()
+  }
+  let __lex_discard_3 := io.print(str.concat("  [", str.concat(cp_id, str.concat("] Authorize idTag=", str.concat(id_tag, str.concat(" -> ", status))))))
   HOk(JObj([("idTagInfo", JObj([("status", JStr(status))]))]))
 }
 
 fn tag_is_allowed(db :: Db, id_tag :: Str) -> [sql] Bool {
-  let res :: Result[List[{ id_tag :: Str }], SqlError] :=
-    sql.query(db,
-      "SELECT id_tag FROM allowed_tags WHERE id_tag = ?",
-      [PStr(id_tag)])
+  let res :: Result[List[{ id_tag :: Str }], SqlError] := sql.query(db, "SELECT id_tag FROM allowed_tags WHERE id_tag = ?", [PStr(id_tag)])
   match res {
-    Err(_)   => false,
+    Err(_) => false,
     Ok(rows) => not list.is_empty(rows),
   }
 }
@@ -221,61 +173,46 @@ fn tag_is_allowed(db :: Db, id_tag :: Str) -> [sql] Bool {
 # Use INSERT ... RETURNING id to get the exact rowid of the inserted
 # transaction atomically — avoids the last_insert_rowid() race when
 # multiple CPs commit StartTransaction concurrently on one DB handle.
-fn on_start_tx(
-  db :: Db, cp_id :: Str, payload :: jv.Json, now :: Str
-) -> [io, sql] route.HandlerResult {
+fn on_start_tx(db :: Db, cp_id :: Str, payload :: jv.Json, now :: Str) -> [io, sql] route.HandlerResult {
   let conn_id := json_int_or(payload, "connectorId", 0)
-  let id_tag  := json_str_or(payload, "idTag",       "")
-  let m_start := json_int_or(payload, "meterStart",  0)
-  let ts      := json_str_or(payload, "timestamp",   now)
-  let res :: Result[List[{ id :: Int }], SqlError] :=
-    sql.query(db,
-      "INSERT INTO transactions
-         (cp_id, connector_id, id_tag, meter_start, start_ts)
-         VALUES (?, ?, ?, ?, ?) RETURNING id",
-      [PStr(cp_id), PInt(conn_id), PStr(id_tag), PInt(m_start), PStr(ts)])
+  let id_tag := json_str_or(payload, "idTag", "")
+  let m_start := json_int_or(payload, "meterStart", 0)
+  let ts := json_str_or(payload, "timestamp", now)
+  let res :: Result[List[{ id :: Int }], SqlError] := sql.query(db, "INSERT INTO transactions\n         (cp_id, connector_id, id_tag, meter_start, start_ts)\n         VALUES (?, ?, ?, ?, ?) RETURNING id", [PStr(cp_id), PInt(conn_id), PStr(id_tag), PInt(m_start), PStr(ts)])
   match res {
     Err(e) => HErr(oe.internal_err(e.message)),
     Ok(rows) => match list.head(rows) {
-      None    => HErr(oe.internal_err("RETURNING id returned no rows")),
+      None => HErr(oe.internal_err("RETURNING id returned no rows")),
       Some(r) => {
         let tx_id := r.id
-        let _ := io.print(str.concat("  [", str.concat(cp_id,
-                  str.concat("] StartTransaction tx=", int.to_str(tx_id)))))
+        let __lex_discard_4 := io.print(str.concat("  [", str.concat(cp_id, str.concat("] StartTransaction tx=", int.to_str(tx_id)))))
         let auth_status := if tag_is_allowed(db, id_tag) {
           en.auth_accepted()
         } else {
           en.auth_invalid()
         }
-        HOk(JObj([
-          ("transactionId", JInt(tx_id)),
-          ("idTagInfo",     JObj([("status", JStr(auth_status))])),
-        ]))
+        HOk(JObj([("transactionId", JInt(tx_id)), ("idTagInfo", JObj([("status", JStr(auth_status))]))]))
       },
     },
   }
 }
 
-fn on_meter_values(
-  db :: Db, cp_id :: Str, payload :: jv.Json, now :: Str
-) -> [io, sql] route.HandlerResult {
+fn on_meter_values(db :: Db, cp_id :: Str, payload :: jv.Json, now :: Str) -> [io, sql] route.HandlerResult {
   let conn_id := json_int_or(payload, "connectorId", 0)
-  let tx_id   := match jv.get_field(payload, "transactionId") {
-    Some(JInt(n)) => n, _ => 0
+  let tx_id := match jv.get_field(payload, "transactionId") {
+    Some(JInt(n)) => n,
+    _ => 0,
   }
   let sample := extract_first_sample(payload, now)
-  let _ := io.print(str.concat("  [", str.concat(cp_id,
-            str.concat("] MeterValues tx=", str.concat(int.to_str(tx_id),
-              str.concat(" wh=", int.to_str(sample.value_wh)))))))
-  let tx_param := if tx_id == 0 { PNull } else { PInt(tx_id) }
-  match sql.exec(db,
-    "INSERT INTO meter_values
-       (cp_id, transaction_id, connector_id, value_wh, ts)
-       VALUES (?, ?, ?, ?, ?)",
-    [PStr(cp_id), tx_param, PInt(conn_id), PInt(sample.value_wh), PStr(sample.ts)])
-  {
+  let __lex_discard_5 := io.print(str.concat("  [", str.concat(cp_id, str.concat("] MeterValues tx=", str.concat(int.to_str(tx_id), str.concat(" wh=", int.to_str(sample.value_wh)))))))
+  let tx_param := if tx_id == 0 {
+    PNull
+  } else {
+    PInt(tx_id)
+  }
+  match sql.exec(db, "INSERT INTO meter_values\n       (cp_id, transaction_id, connector_id, value_wh, ts)\n       VALUES (?, ?, ?, ?, ?)", [PStr(cp_id), tx_param, PInt(conn_id), PInt(sample.value_wh), PStr(sample.ts)]) {
     Err(e) => HErr(oe.internal_err(e.message)),
-    Ok(_)  => HOk(JObj([])),
+    Ok(_) => HOk(JObj([])),
   }
 }
 
@@ -285,7 +222,7 @@ fn extract_first_sample(payload :: jv.Json, now :: Str) -> Sample {
   match jv.get_field(payload, "meterValue") {
     Some(JList(mvs)) => match list.head(mvs) {
       Some(mv) => sample_from_mv(mv, now),
-      None     => { value_wh: 0, ts: now },
+      None => { value_wh: 0, ts: now },
     },
     _ => { value_wh: 0, ts: now },
   }
@@ -293,11 +230,13 @@ fn extract_first_sample(payload :: jv.Json, now :: Str) -> Sample {
 
 fn sample_from_mv(mv :: jv.Json, now :: Str) -> Sample {
   let ts := match jv.get_field(mv, "timestamp") {
-    Some(JStr(t)) => t, _ => now,
+    Some(JStr(t)) => t,
+    _ => now,
   }
   let wh := match jv.get_field(mv, "sampledValue") {
     Some(JList(svs)) => match list.head(svs) {
-      Some(sv) => wh_from_sv(sv), None => 0,
+      Some(sv) => wh_from_sv(sv),
+      None => 0,
     },
     _ => 0,
   }
@@ -306,118 +245,101 @@ fn sample_from_mv(mv :: jv.Json, now :: Str) -> Sample {
 
 fn wh_from_sv(sv :: jv.Json) -> Int {
   match jv.get_field(sv, "value") {
-    Some(JStr(v)) => match str.to_int(v) { Some(n) => n, None => 0 },
+    Some(JStr(v)) => match str.to_int(v) {
+      Some(n) => n,
+      None => 0,
+    },
     Some(JInt(n)) => n,
-    _             => 0,
+    _ => 0,
   }
 }
 
-fn on_heartbeat(
-  _db :: Db, cp_id :: Str, _payload :: jv.Json, now :: Str
-) -> [io, sql] route.HandlerResult {
-  let _ := io.print(str.concat("  [", str.concat(cp_id, "] Heartbeat")))
+fn on_heartbeat(_db :: Db, cp_id :: Str, _payload :: jv.Json, now :: Str) -> [io, sql] route.HandlerResult {
+  let __lex_discard_6 := io.print(str.concat("  [", str.concat(cp_id, "] Heartbeat")))
   HOk(JObj([("currentTime", JStr(now))]))
 }
 
-fn on_stop_tx(
-  db :: Db, cp_id :: Str, payload :: jv.Json, now :: Str
-) -> [io, sql] route.HandlerResult {
-  let tx_id  := json_int_or(payload, "transactionId", 0)
-  let m_stop := json_int_or(payload, "meterStop",     0)
-  let ts     := json_str_or(payload, "timestamp",     now)
-  let reason := json_str_or(payload, "reason",        en.reason_local())
-  let _ := io.print(str.concat("  [", str.concat(cp_id,
-            str.concat("] StopTransaction tx=", str.concat(int.to_str(tx_id),
-              str.concat(" wh=", int.to_str(m_stop)))))))
-  match sql.exec(db,
-    "UPDATE transactions SET meter_stop = ?, stop_ts = ?, reason = ?
-       WHERE id = ? AND cp_id = ?",
-    [PInt(m_stop), PStr(ts), PStr(reason), PInt(tx_id), PStr(cp_id)])
-  {
+fn on_stop_tx(db :: Db, cp_id :: Str, payload :: jv.Json, now :: Str) -> [io, sql] route.HandlerResult {
+  let tx_id := json_int_or(payload, "transactionId", 0)
+  let m_stop := json_int_or(payload, "meterStop", 0)
+  let ts := json_str_or(payload, "timestamp", now)
+  let reason := json_str_or(payload, "reason", en.reason_local())
+  let __lex_discard_7 := io.print(str.concat("  [", str.concat(cp_id, str.concat("] StopTransaction tx=", str.concat(int.to_str(tx_id), str.concat(" wh=", int.to_str(m_stop)))))))
+  match sql.exec(db, "UPDATE transactions SET meter_stop = ?, stop_ts = ?, reason = ?\n       WHERE id = ? AND cp_id = ?", [PInt(m_stop), PStr(ts), PStr(reason), PInt(tx_id), PStr(cp_id)]) {
     Err(e) => HErr(oe.internal_err(e.message)),
-    Ok(_)  => HOk(JObj([
-      ("idTagInfo", JObj([("status", JStr(en.auth_accepted()))])),
-    ])),
+    Ok(_) => HOk(JObj([("idTagInfo", JObj([("status", JStr(en.auth_accepted()))]))])),
   }
 }
 
-fn on_data_transfer(
-  _db :: Db, cp_id :: Str, _payload :: jv.Json, _now :: Str
-) -> [io, sql] route.HandlerResult {
-  let _ := io.print(str.concat("  [", str.concat(cp_id, "] DataTransfer (stub)")))
+fn on_data_transfer(_db :: Db, cp_id :: Str, _payload :: jv.Json, _now :: Str) -> [io, sql] route.HandlerResult {
+  let __lex_discard_8 := io.print(str.concat("  [", str.concat(cp_id, "] DataTransfer (stub)")))
   HOk(JObj([("status", JStr(en.dt_accepted()))]))
 }
 
 # ---- Dispatch -----------------------------------------------------
-
-fn dispatch_call(
-  db :: Db, cp_id :: Str, action :: Str,
-  message_id :: Str, payload :: jv.Json, now :: Str
-) -> [io, time, sql] msg.Frame {
+fn dispatch_call(db :: Db, cp_id :: Str, action :: Str, message_id :: Str, payload :: jv.Json, now :: Str) -> [io, time, sql] msg.Frame {
   if action == a.boot_notification() {
-    handle(message_id, sch.validate_boot_notification_req,
-      payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
-        on_boot(db, cp_id, p, now)
-      })
-  } else { if action == a.status_notification() {
-    handle(message_id, sch.validate_status_notification_req,
-      payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
+    handle(message_id, sch.validate_boot_notification_req, payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
+      on_boot(db, cp_id, p, now)
+    })
+  } else {
+    if action == a.status_notification() {
+      handle(message_id, sch.validate_status_notification_req, payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
         on_status(db, cp_id, p, now)
       })
-  } else { if action == a.authorize() {
-    handle(message_id, sch.validate_authorize_req,
-      payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
-        on_authorize(db, cp_id, p, now)
-      })
-  } else { if action == a.start_transaction() {
-    handle(message_id, sch.validate_start_transaction_req,
-      payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
-        on_start_tx(db, cp_id, p, now)
-      })
-  } else { if action == a.meter_values() {
-    handle(message_id, sch.validate_meter_values_req,
-      payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
-        on_meter_values(db, cp_id, p, now)
-      })
-  } else { if action == a.heartbeat() {
-    handle(message_id, sch.validate_heartbeat_req,
-      payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
-        on_heartbeat(db, cp_id, p, now)
-      })
-  } else { if action == a.stop_transaction() {
-    handle(message_id, sch.validate_stop_transaction_req,
-      payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
-        on_stop_tx(db, cp_id, p, now)
-      })
-  } else { if action == a.data_transfer() {
-    handle(message_id, sch.validate_data_transfer_req,
-      payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
-        on_data_transfer(db, cp_id, p, now)
-      })
-  } else {
-    let _ := io.print(str.concat("  [", str.concat(cp_id,
-              str.concat("] NotImplemented: ", action))))
-    let oerr := oe.not_implemented_err(action)
-    msg.new_call_error(message_id, oerr.code, oerr.description, oerr.details)
-  } } } } } } } }
+    } else {
+      if action == a.authorize() {
+        handle(message_id, sch.validate_authorize_req, payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
+          on_authorize(db, cp_id, p, now)
+        })
+      } else {
+        if action == a.start_transaction() {
+          handle(message_id, sch.validate_start_transaction_req, payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
+            on_start_tx(db, cp_id, p, now)
+          })
+        } else {
+          if action == a.meter_values() {
+            handle(message_id, sch.validate_meter_values_req, payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
+              on_meter_values(db, cp_id, p, now)
+            })
+          } else {
+            if action == a.heartbeat() {
+              handle(message_id, sch.validate_heartbeat_req, payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
+                on_heartbeat(db, cp_id, p, now)
+              })
+            } else {
+              if action == a.stop_transaction() {
+                handle(message_id, sch.validate_stop_transaction_req, payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
+                  on_stop_tx(db, cp_id, p, now)
+                })
+              } else {
+                if action == a.data_transfer() {
+                  handle(message_id, sch.validate_data_transfer_req, payload, fn (p :: jv.Json) -> [io, sql] route.HandlerResult {
+                    on_data_transfer(db, cp_id, p, now)
+                  })
+                } else {
+                  let __lex_discard_9 := io.print(str.concat("  [", str.concat(cp_id, str.concat("] NotImplemented: ", action))))
+                  let oerr := oe.not_implemented_err(action)
+                  msg.new_call_error(message_id, oerr.code, oerr.description, oerr.details)
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
-fn handle(
-  message_id :: Str,
-  validator  :: (jv.Json) -> Result[jv.Json,
-                              List[{ path :: Str, code :: Str, message :: Str }]],
-  payload    :: jv.Json,
-  body       :: (jv.Json) -> [io, sql] route.HandlerResult
-) -> [io, sql] msg.Frame {
+fn handle(message_id :: Str, validator :: (jv.Json) -> Result[jv.Json, List[{ path :: Str, code :: Str, message :: Str }]], payload :: jv.Json, body :: (jv.Json) -> [io, sql] route.HandlerResult) -> [io, sql] msg.Frame {
   match validator(payload) {
     Err(es) => {
       let oerr := oe.from_schema_errors(es)
       msg.new_call_error(message_id, oerr.code, oerr.description, oerr.details)
     },
     Ok(normalized) => match body(normalized) {
-      HOk(out)   => msg.new_call_result(message_id, out),
-      HErr(oerr) => msg.new_call_error(
-                      message_id, oerr.code, oerr.description, oerr.details),
+      HOk(out) => msg.new_call_result(message_id, out),
+      HErr(oerr) => msg.new_call_error(message_id, oerr.code, oerr.description, oerr.details),
     },
   }
 }
@@ -426,77 +348,74 @@ fn handle(
 #
 # ws.last_segment("/ocpp/CP-001") == "CP-001"
 # ws.send / ws.noop replace raw WsSend / WsNoOp constructors.
-
 fn handle_raw(db :: Db, cp_id :: Str, raw :: Str) -> [io, time, sql] Str {
   match msg.parse(raw) {
-    Err(fe) => msg.encode(msg.new_call_error(
-                "", fe.code, fe.message, JObj([]))),
+    Err(fe) => msg.encode(msg.new_call_error("", fe.code, fe.message, JObj([]))),
     Ok(FrameCall(c)) => {
       let now := time.now_str()
-      msg.encode(dispatch_call(db, cp_id, c.action,
-                               c.message_id, c.payload, now))
+      msg.encode(dispatch_call(db, cp_id, c.action, c.message_id, c.payload, now))
     },
     Ok(FrameCallResult(_)) => "",
-    Ok(FrameCallError(e))  => {
-      let _ := io.print(str.concat("  [", str.concat(cp_id,
-                str.concat("] inbound CallError: ", e.description))))
+    Ok(FrameCallError(e)) => {
+      let __lex_discard_10 := io.print(str.concat("  [", str.concat(cp_id, str.concat("] inbound CallError: ", e.description))))
       ""
     },
   }
 }
 
-fn build_on_message(
-  db :: Db
-) -> (WsConn, WsMessage) -> [io, time, sql] WsAction {
+fn build_on_message(db :: Db) -> (WsConn, WsMessage) -> [io, time, sql] WsAction {
   fn (conn :: WsConn, m :: WsMessage) -> [io, time, sql] WsAction {
     let cp_id := ws.last_segment(conn.path)
     match m {
       WsText(raw) => {
         let out := handle_raw(db, cp_id, raw)
-        if out == "" { ws.noop() } else { ws.send(out) }
+        if out == "" {
+          ws.noop()
+        } else {
+          ws.send(out)
+        }
       },
-      WsClose     => {
-        let _ := io.print(str.concat("  [", str.concat(cp_id, "] disconnected")))
+      WsClose => {
+        let __lex_discard_11 := io.print(str.concat("  [", str.concat(cp_id, "] disconnected")))
         ws.noop()
       },
-      WsPing      => ws.noop(),
+      WsPing => ws.noop(),
       WsBinary(_) => ws.noop(),
     }
   }
 }
 
 # ---- Tiny helpers ------------------------------------------------
-
 fn json_str_or(j :: jv.Json, key :: Str, default :: Str) -> Str {
   match jv.get_field(j, key) {
     Some(JStr(s)) => s,
-    _             => default,
+    _ => default,
   }
 }
 
 fn json_int_or(j :: jv.Json, key :: Str, default :: Int) -> Int {
   match jv.get_field(j, key) {
     Some(JInt(n)) => n,
-    _             => default,
+    _ => default,
   }
 }
 
 # ---- Entry point -------------------------------------------------
-
 fn main() -> [net, io, time, sql, fs_write, env] Nil {
   let path := db_path()
-  let _ := io.print("=== Depot CSMS (OCPP 1.6, SQLite, lex-web) ===")
-  let _ := io.print("    ws://localhost:9000/ocpp/<cp_id>")
-  let _ := io.print(str.concat("    db:   ", path))
-  let _ := io.print("    tags: USER-001 ... USER-010")
+  let __lex_discard_12 := io.print("=== Depot CSMS (OCPP 1.6, SQLite, lex-web) ===")
+  let __lex_discard_13 := io.print("    ws://localhost:9000/ocpp/<cp_id>")
+  let __lex_discard_14 := io.print(str.concat("    db:   ", path))
+  let __lex_discard_15 := io.print("    tags: USER-001 ... USER-010")
   match sql.open(path) {
     Err(e) => io.print(str.concat("! sql.open: ", e.message)),
     Ok(db) => match init_db(db) {
       Err(e) => io.print(str.concat("! schema init: ", e.message)),
-      Ok(_)  => {
-        let _ := io.print("    schema ready; accepting connections...")
+      Ok(_) => {
+        let __lex_discard_16 := io.print("    schema ready; accepting connections...")
         net.serve_ws_fn(9000, cp.version_v16(), build_on_message(db))
       },
     },
   }
 }
+

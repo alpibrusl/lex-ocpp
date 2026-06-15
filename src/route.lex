@@ -23,20 +23,16 @@
 import "std.list" as list
 
 import "lex-schema/json_value" as jv
-import "lex-schema/error"      as e
+
+import "lex-schema/error" as e
 
 import "./messages" as msg
-import "./error"    as oe
+
+import "./error" as oe
 
 # ---- Handler types -----------------------------------------------
+type HandlerResult = HOk(jv.Json) | HErr(oe.OcppError)
 
-type HandlerResult =
-    HOk(jv.Json)
-  | HErr(oe.OcppError)
-
-# A pure handler maps an inbound Call payload to a response payload
-# (or an OcppError). Callers needing effects (logging, persistence)
-# layer them outside the registry — see `examples/csms_v16.lex`.
 type Handler = (jv.Json) -> HandlerResult
 
 # A validator takes a payload and either passes it through (possibly
@@ -50,20 +46,11 @@ type Validator = (jv.Json) -> Result[jv.Json, List[e.Error]]
 type Fallback = (Str, jv.Json) -> HandlerResult
 
 # ---- Registry datatype -------------------------------------------
+type RouteEntry = { action :: Str, validator :: Option[(jv.Json) -> Result[jv.Json, List[e.Error]]], handler :: (jv.Json) -> HandlerResult }
 
-type RouteEntry = {
-  action    :: Str,
-  validator :: Option[(jv.Json) -> Result[jv.Json, List[e.Error]]],
-  handler   :: (jv.Json) -> HandlerResult,
-}
-
-type Registry = {
-  routes     :: List[RouteEntry],
-  on_unknown :: (Str, jv.Json) -> HandlerResult,
-}
+type Registry = { routes :: List[RouteEntry], on_unknown :: (Str, jv.Json) -> HandlerResult }
 
 # ---- Registry construction ---------------------------------------
-
 fn new() -> Registry {
   { routes: [], on_unknown: default_unknown }
 }
@@ -87,34 +74,32 @@ fn handler(reg :: Registry, action :: Str, h :: Handler) -> Registry {
 # Register a handler with a payload validator. The dispatcher will
 # call the validator first; a schema failure surfaces as a
 # `PropertyConstraintViolation` CallError before the handler runs.
-fn handler_with_schema(
-  reg       :: Registry,
-  action    :: Str,
-  validator :: Validator,
-  h         :: Handler
-) -> Registry {
+fn handler_with_schema(reg :: Registry, action :: Str, validator :: Validator, h :: Handler) -> Registry {
   add_entry(reg, { action: action, validator: Some(validator), handler: h })
 }
 
 fn add_entry(reg :: Registry, entry :: RouteEntry) -> Registry {
-  { routes: list.concat(reg.routes, [entry]),
-    on_unknown: reg.on_unknown }
+  { routes: list.concat(reg.routes, [entry]), on_unknown: reg.on_unknown }
 }
 
 # ---- Lookup ------------------------------------------------------
-
 fn find(reg :: Registry, action :: Str) -> Option[RouteEntry] {
-  list.fold(reg.routes, None,
-    fn (acc :: Option[RouteEntry], entry :: RouteEntry) -> Option[RouteEntry] {
-      match acc {
-        Some(_) => acc,
-        None    => if entry.action == action { Some(entry) } else { None },
-      }
-    })
+  list.fold(reg.routes, None, fn (acc :: Option[RouteEntry], entry :: RouteEntry) -> Option[RouteEntry] {
+    match acc {
+      Some(_) => acc,
+      None => if entry.action == action {
+        Some(entry)
+      } else {
+        None
+      },
+    }
+  })
 }
 
 fn actions(reg :: Registry) -> List[Str] {
-  list.map(reg.routes, fn (entry :: RouteEntry) -> Str { entry.action })
+  list.map(reg.routes, fn (entry :: RouteEntry) -> Str {
+    entry.action
+  })
 }
 
 # ---- Dispatch ----------------------------------------------------
@@ -123,38 +108,27 @@ fn actions(reg :: Registry) -> List[Str] {
 # frame (CallResult or CallError). Non-Call frames are returned
 # unchanged — they're not the dispatcher's responsibility, but
 # carrying them through keeps the call site uniform.
-
 fn dispatch(reg :: Registry, frame :: msg.Frame) -> msg.Frame {
   match frame {
-    FrameCall(c)       => dispatch_call(reg, c),
+    FrameCall(c) => dispatch_call(reg, c),
     FrameCallResult(_) => frame,
-    FrameCallError(_)  => frame,
+    FrameCallError(_) => frame,
   }
 }
 
-fn dispatch_call(
-  reg :: Registry,
-  c   :: { message_id :: Str, action :: Str, payload :: jv.Json }
-) -> msg.Frame {
+fn dispatch_call(reg :: Registry, c :: { message_id :: Str, action :: Str, payload :: jv.Json }) -> msg.Frame {
   match find(reg, c.action) {
-    None        => result_from_handler(c.message_id,
-                     reg.on_unknown(c.action, c.payload)),
+    None => result_from_handler(c.message_id, reg.on_unknown(c.action, c.payload)),
     Some(entry) => run_entry(c.message_id, entry, c.payload),
   }
 }
 
-fn run_entry(
-  message_id :: Str,
-  entry      :: RouteEntry,
-  payload    :: jv.Json
-) -> msg.Frame {
+fn run_entry(message_id :: Str, entry :: RouteEntry, payload :: jv.Json) -> msg.Frame {
   match entry.validator {
-    None     => result_from_handler(message_id, (entry.handler)(payload)),
+    None => result_from_handler(message_id, entry.handler(payload)),
     Some(vf) => match vf(payload) {
-      Err(es) => result_from_handler(message_id,
-                   HErr(oe.from_schema_errors(es))),
-      Ok(normalized) => result_from_handler(message_id,
-                          (entry.handler)(normalized)),
+      Err(es) => result_from_handler(message_id, HErr(oe.from_schema_errors(es))),
+      Ok(normalized) => result_from_handler(message_id, entry.handler(normalized)),
     },
   }
 }
@@ -162,16 +136,18 @@ fn run_entry(
 fn result_from_handler(message_id :: Str, hr :: HandlerResult) -> msg.Frame {
   match hr {
     HOk(payload) => msg.new_call_result(message_id, payload),
-    HErr(oerr)   => msg.new_call_error(message_id,
-                      oerr.code, oerr.description, oerr.details),
+    HErr(oerr) => msg.new_call_error(message_id, oerr.code, oerr.description, oerr.details),
   }
 }
 
 # ---- Convenience builders for HandlerResult ----------------------
+fn ok(payload :: jv.Json) -> HandlerResult {
+  HOk(payload)
+}
 
-fn ok(payload :: jv.Json) -> HandlerResult { HOk(payload) }
-
-fn fail(oerr :: oe.OcppError) -> HandlerResult { HErr(oerr) }
+fn fail(oerr :: oe.OcppError) -> HandlerResult {
+  HErr(oerr)
+}
 
 fn fail_with(code :: Str, description :: Str) -> HandlerResult {
   HErr(oe.err(code, description))
@@ -184,10 +160,10 @@ fn fail_with(code :: Str, description :: Str) -> HandlerResult {
 # frames on a *best-effort* basis: if the parse failed so badly we
 # can't recover a message_id, we return Err and let the transport
 # decide whether to drop or close the connection.
-
 fn handle_raw(reg :: Registry, raw :: Str) -> Result[Str, msg.FrameError] {
   match msg.parse(raw) {
     Err(fe) => Err(fe),
-    Ok(f)   => Ok(msg.encode(dispatch(reg, f))),
+    Ok(f) => Ok(msg.encode(dispatch(reg, f))),
   }
 }
+

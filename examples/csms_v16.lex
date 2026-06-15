@@ -30,33 +30,37 @@
 #     details listing every failing constraint — never reaches the
 #     handler.
 
-import "std.io"   as io
-import "std.net"  as net
-import "std.str"  as str
+import "std.io" as io
+
+import "std.net" as net
+
+import "std.str" as str
+
 import "std.list" as list
 
 import "lex-schema/json_value" as jv
 
-import "../src/messages"      as msg
-import "../src/error"         as oe
-import "../src/route"         as route
-import "../src/charge_point"  as cp
-import "../src/v16/action"    as a
-import "../src/v16/enums"     as en
-import "../src/v16/schemas"   as sch
+import "../src/messages" as msg
+
+import "../src/error" as oe
+
+import "../src/route" as route
+
+import "../src/charge_point" as cp
+
+import "../src/v16/action" as a
+
+import "../src/v16/enums" as en
+
+import "../src/v16/schemas" as sch
 
 # ---- Handler bodies (pure, per OCPP-1.6 §4) ----------------------
 #
 # Every handler takes the validated payload and returns a response
 # payload (or an OcppError). The example uses canned timestamps and
 # stub semantics — wire your own state machine in here.
-
 fn on_boot_notification(_payload :: jv.Json) -> route.HandlerResult {
-  route.ok(JObj([
-    ("currentTime", JStr("2026-05-13T12:00:00Z")),
-    ("interval",    JInt(300)),
-    ("status",      JStr(en.reg_accepted())),
-  ]))
+  route.ok(JObj([("currentTime", JStr("2026-05-13T12:00:00Z")), ("interval", JInt(300)), ("status", JStr(en.reg_accepted()))]))
 }
 
 fn on_heartbeat(_payload :: jv.Json) -> route.HandlerResult {
@@ -68,34 +72,22 @@ fn on_status_notification(_payload :: jv.Json) -> route.HandlerResult {
 }
 
 fn on_authorize(payload :: jv.Json) -> route.HandlerResult {
-  # Echo the inbound id_tag back as an Accepted IdTagInfo. A real CSMS
-  # would consult a database / whitelist here.
   match jv.j_str("", payload, "idTag", []) {
-    Err(_)    => route.fail(oe.err(oe.property_constraint_violation(),
-                                   "missing idTag")),
-    Ok(_)     => route.ok(JObj([
-      ("idTagInfo", JObj([("status", JStr(en.auth_accepted()))])),
-    ])),
+    Err(_) => route.fail(oe.err(oe.property_constraint_violation(), "missing idTag")),
+    Ok(_) => route.ok(JObj([("idTagInfo", JObj([("status", JStr(en.auth_accepted()))]))])),
   }
 }
 
 fn on_meter_values(_payload :: jv.Json) -> route.HandlerResult {
-  # Spec: MeterValues.conf is empty. We accept everything and store
-  # nothing — a real CSMS would persist via lex-orm.
   route.ok(JObj([]))
 }
 
 fn on_start_transaction(_payload :: jv.Json) -> route.HandlerResult {
-  route.ok(JObj([
-    ("transactionId", JInt(42)),
-    ("idTagInfo",     JObj([("status", JStr(en.auth_accepted()))])),
-  ]))
+  route.ok(JObj([("transactionId", JInt(42)), ("idTagInfo", JObj([("status", JStr(en.auth_accepted()))]))]))
 }
 
 fn on_stop_transaction(_payload :: jv.Json) -> route.HandlerResult {
-  route.ok(JObj([
-    ("idTagInfo", JObj([("status", JStr(en.auth_accepted()))])),
-  ]))
+  route.ok(JObj([("idTagInfo", JObj([("status", JStr(en.auth_accepted()))]))]))
 }
 
 fn on_data_transfer(_payload :: jv.Json) -> route.HandlerResult {
@@ -111,51 +103,28 @@ fn on_diagnostics_status_notification(_payload :: jv.Json) -> route.HandlerResul
 }
 
 # ---- Registry wiring --------------------------------------------
-
 fn central_system() -> cp.ChargePoint {
-  cp.new_v16("csms-example")
-    |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
-         cp.handler_with_schema(c, a.boot_notification(),
-           sch.validate_boot_notification_req, on_boot_notification)
-       }
-    |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
-         cp.handler_with_schema(c, a.heartbeat(),
-           sch.validate_heartbeat_req, on_heartbeat)
-       }
-    |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
-         cp.handler_with_schema(c, a.status_notification(),
-           sch.validate_status_notification_req, on_status_notification)
-       }
-    |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
-         cp.handler_with_schema(c, a.authorize(),
-           sch.validate_authorize_req, on_authorize)
-       }
-    |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
-         cp.handler_with_schema(c, a.meter_values(),
-           sch.validate_meter_values_req, on_meter_values)
-       }
-    |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
-         cp.handler_with_schema(c, a.start_transaction(),
-           sch.validate_start_transaction_req, on_start_transaction)
-       }
-    |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
-         cp.handler_with_schema(c, a.stop_transaction(),
-           sch.validate_stop_transaction_req, on_stop_transaction)
-       }
-    |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
-         cp.handler_with_schema(c, a.data_transfer(),
-           sch.validate_data_transfer_req, on_data_transfer)
-       }
-    |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
-         cp.handler_with_schema(c, a.firmware_status_notification(),
-           sch.validate_firmware_status_notification_req,
-           on_firmware_status_notification)
-       }
-    |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
-         cp.handler_with_schema(c, a.diagnostics_status_notification(),
-           sch.validate_diagnostics_status_notification_req,
-           on_diagnostics_status_notification)
-       }
+  (((((((((cp.new_v16("csms-example") |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
+    cp.handler_with_schema(c, a.boot_notification(), sch.validate_boot_notification_req, on_boot_notification)
+  }) |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
+    cp.handler_with_schema(c, a.heartbeat(), sch.validate_heartbeat_req, on_heartbeat)
+  }) |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
+    cp.handler_with_schema(c, a.status_notification(), sch.validate_status_notification_req, on_status_notification)
+  }) |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
+    cp.handler_with_schema(c, a.authorize(), sch.validate_authorize_req, on_authorize)
+  }) |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
+    cp.handler_with_schema(c, a.meter_values(), sch.validate_meter_values_req, on_meter_values)
+  }) |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
+    cp.handler_with_schema(c, a.start_transaction(), sch.validate_start_transaction_req, on_start_transaction)
+  }) |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
+    cp.handler_with_schema(c, a.stop_transaction(), sch.validate_stop_transaction_req, on_stop_transaction)
+  }) |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
+    cp.handler_with_schema(c, a.data_transfer(), sch.validate_data_transfer_req, on_data_transfer)
+  }) |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
+    cp.handler_with_schema(c, a.firmware_status_notification(), sch.validate_firmware_status_notification_req, on_firmware_status_notification)
+  }) |> fn (c :: cp.ChargePoint) -> cp.ChargePoint {
+    cp.handler_with_schema(c, a.diagnostics_status_notification(), sch.validate_diagnostics_status_notification_req, on_diagnostics_status_notification)
+  }
 }
 
 # ---- WebSocket adapter -------------------------------------------
@@ -165,31 +134,31 @@ fn central_system() -> cp.ChargePoint {
 # a CallError frame using the canonical OCPP `ProtocolError` code;
 # if even that fails (e.g., the input has no message_id), we drop
 # the frame by returning WsNoOp.
-
 fn on_message(_conn :: WsConn, m :: WsMessage) -> WsAction {
   match m {
     WsText(raw) => match cp.handle_raw(central_system(), raw) {
       Ok(out) => WsSend(out),
-      Err(fe) => WsSend(msg.encode(msg.new_call_error(
-                   "", fe.code, fe.message, JObj([])))),
+      Err(fe) => WsSend(msg.encode(msg.new_call_error("", fe.code, fe.message, JObj([])))),
     },
     WsClose => WsNoOp,
-    _       => WsNoOp,
+    _ => WsNoOp,
   }
 }
 
 # ---- Entry point -------------------------------------------------
-
 fn main() -> [net, io, time] Nil {
-  let _ := io.print("CSMS v1.6  ws://localhost:9000/ocpp/<charger-id>")
-  let _ := io.print(describe_routes())
+  let __lex_discard_1 := io.print("CSMS v1.6  ws://localhost:9000/ocpp/<charger-id>")
+  let __lex_discard_2 := io.print(describe_routes())
   net.serve_ws_fn(9000, cp.version_v16(), on_message)
 }
 
 fn describe_routes() -> Str {
-  str.concat("registered actions: ",
-    list.fold(cp.actions(central_system()), "",
-      fn (acc :: Str, action :: Str) -> Str {
-        if acc == "" { action } else { str.concat(acc, str.concat(", ", action)) }
-      }))
+  str.concat("registered actions: ", list.fold(cp.actions(central_system()), "", fn (acc :: Str, action :: Str) -> Str {
+    if acc == "" {
+      action
+    } else {
+      str.concat(acc, str.concat(", ", action))
+    }
+  }))
 }
+

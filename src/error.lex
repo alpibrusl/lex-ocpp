@@ -16,7 +16,8 @@
 #
 # Effects: none.
 
-import "std.str"  as str
+import "std.str" as str
+
 import "std.list" as list
 
 import "lex-schema/json_value" as jv
@@ -26,63 +27,75 @@ import "lex-schema/json_value" as jv
 # Constants are the *exact* strings the spec requires on the wire.
 # We expose them as `fn () -> Str` so callers can refer to them
 # with parens (preventing accidental typos at the call site).
+fn not_implemented() -> Str {
+  "NotImplemented"
+}
 
-fn not_implemented()                  -> Str { "NotImplemented" }
-fn not_supported()                    -> Str { "NotSupported" }
-fn internal_error()                   -> Str { "InternalError" }
-fn protocol_error()                   -> Str { "ProtocolError" }
-fn security_error()                   -> Str { "SecurityError" }
-fn generic_error()                    -> Str { "GenericError" }
+fn not_supported() -> Str {
+  "NotSupported"
+}
+
+fn internal_error() -> Str {
+  "InternalError"
+}
+
+fn protocol_error() -> Str {
+  "ProtocolError"
+}
+
+fn security_error() -> Str {
+  "SecurityError"
+}
+
+fn generic_error() -> Str {
+  "GenericError"
+}
 
 # OCPP 1.6 spelling.
-fn formation_violation()              -> Str { "FormationViolation" }
-fn occurence_constraint_violation()   -> Str { "OccurenceConstraintViolation" }
-fn property_constraint_violation()    -> Str { "PropertyConstraintViolation" }
-fn type_constraint_violation()        -> Str { "TypeConstraintViolation" }
+fn formation_violation() -> Str {
+  "FormationViolation"
+}
+
+fn occurence_constraint_violation() -> Str {
+  "OccurenceConstraintViolation"
+}
+
+fn property_constraint_violation() -> Str {
+  "PropertyConstraintViolation"
+}
+
+fn type_constraint_violation() -> Str {
+  "TypeConstraintViolation"
+}
 
 # OCPP 2.0.1 spelling (the spec corrected the original typo).
-fn format_violation()                 -> Str { "FormatViolation" }
-fn occurrence_constraint_violation()  -> Str { "OccurrenceConstraintViolation" }
+fn format_violation() -> Str {
+  "FormatViolation"
+}
+
+fn occurrence_constraint_violation() -> Str {
+  "OccurrenceConstraintViolation"
+}
 
 # OCPP 2.0.1 additions.
-fn rpc_framework_error()              -> Str { "RpcFrameworkError" }
-fn message_type_not_supported()       -> Str { "MessageTypeNotSupported" }
+fn rpc_framework_error() -> Str {
+  "RpcFrameworkError"
+}
+
+fn message_type_not_supported() -> Str {
+  "MessageTypeNotSupported"
+}
 
 # ---- All v1.6 / v2.0.1 catalogs as lists -------------------------
 #
 # Useful for schema validation (StrOneOf), property tests, and
 # documentation generators.
-
 fn all_v16() -> List[Str] {
-  [
-    not_implemented(),
-    not_supported(),
-    internal_error(),
-    protocol_error(),
-    security_error(),
-    formation_violation(),
-    property_constraint_violation(),
-    occurence_constraint_violation(),
-    type_constraint_violation(),
-    generic_error(),
-  ]
+  [not_implemented(), not_supported(), internal_error(), protocol_error(), security_error(), formation_violation(), property_constraint_violation(), occurence_constraint_violation(), type_constraint_violation(), generic_error()]
 }
 
 fn all_v201() -> List[Str] {
-  [
-    not_implemented(),
-    not_supported(),
-    internal_error(),
-    protocol_error(),
-    security_error(),
-    format_violation(),
-    property_constraint_violation(),
-    occurrence_constraint_violation(),
-    type_constraint_violation(),
-    generic_error(),
-    rpc_framework_error(),
-    message_type_not_supported(),
-  ]
+  [not_implemented(), not_supported(), internal_error(), protocol_error(), security_error(), format_violation(), property_constraint_violation(), occurrence_constraint_violation(), type_constraint_violation(), generic_error(), rpc_framework_error(), message_type_not_supported()]
 }
 
 # ---- OcppError ADT -----------------------------------------------
@@ -91,12 +104,7 @@ fn all_v201() -> List[Str] {
 # to wire-level CallError frames. Carrying the details as a `Json`
 # means callers can attach arbitrary diagnostic context without
 # committing to a particular shape.
-
-type OcppError = {
-  code        :: Str,
-  description :: Str,
-  details     :: jv.Json,
-}
+type OcppError = { code :: Str, description :: Str, details :: jv.Json }
 
 fn err(code :: Str, description :: Str) -> OcppError {
   { code: code, description: description, details: JObj([]) }
@@ -107,15 +115,12 @@ fn err_with(code :: Str, description :: Str, details :: jv.Json) -> OcppError {
 }
 
 # ---- Common helpers ----------------------------------------------
-
 fn not_implemented_err(action :: Str) -> OcppError {
-  err(not_implemented(),
-    str.concat("action not implemented: ", action))
+  err(not_implemented(), str.concat("action not implemented: ", action))
 }
 
 fn not_supported_err(action :: Str) -> OcppError {
-  err(not_supported(),
-    str.concat("action not supported: ", action))
+  err(not_supported(), str.concat("action not supported: ", action))
 }
 
 fn internal_err(description :: Str) -> OcppError {
@@ -131,13 +136,8 @@ fn protocol_err(description :: Str) -> OcppError {
 # each entry is `{ path, code, message }`.
 fn from_schema_errors(es :: List[{ path :: Str, code :: Str, message :: Str }]) -> OcppError {
   let entries := list.map(es, fn (e :: { path :: Str, code :: Str, message :: Str }) -> jv.Json {
-    JObj([
-      ("path",    JStr(e.path)),
-      ("code",    JStr(e.code)),
-      ("message", JStr(e.message)),
-    ])
+    JObj([("path", JStr(e.path)), ("code", JStr(e.code)), ("message", JStr(e.message))])
   })
-  err_with(property_constraint_violation(),
-    "request payload failed schema validation",
-    JObj([("violations", JList(entries))]))
+  err_with(property_constraint_violation(), "request payload failed schema validation", JObj([("violations", JList(entries))]))
 }
+

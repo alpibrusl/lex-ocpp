@@ -14,10 +14,10 @@ import "std.list" as list
 import "lex-schema/json_value" as jv
 
 import "./datatypes" as dt
-import "./enums"     as en
+
+import "./enums" as en
 
 # ---- CancelReservation ------------------------------------------
-
 type CancelReservationConf = { status :: Str }
 
 fn parse_cancel_reservation_conf(j :: jv.Json) -> CancelReservationConf {
@@ -25,7 +25,6 @@ fn parse_cancel_reservation_conf(j :: jv.Json) -> CancelReservationConf {
 }
 
 # ---- ChangeAvailability -----------------------------------------
-
 type ChangeAvailabilityConf = { status :: Str }
 
 fn parse_change_availability_conf(j :: jv.Json) -> ChangeAvailabilityConf {
@@ -33,7 +32,6 @@ fn parse_change_availability_conf(j :: jv.Json) -> ChangeAvailabilityConf {
 }
 
 # ---- ChangeConfiguration ----------------------------------------
-
 type ChangeConfigurationConf = { status :: Str }
 
 fn parse_change_configuration_conf(j :: jv.Json) -> ChangeConfigurationConf {
@@ -41,7 +39,6 @@ fn parse_change_configuration_conf(j :: jv.Json) -> ChangeConfigurationConf {
 }
 
 # ---- ClearCache -------------------------------------------------
-
 type ClearCacheConf = { status :: Str }
 
 fn parse_clear_cache_conf(j :: jv.Json) -> ClearCacheConf {
@@ -49,7 +46,6 @@ fn parse_clear_cache_conf(j :: jv.Json) -> ClearCacheConf {
 }
 
 # ---- ClearChargingProfile ---------------------------------------
-
 type ClearChargingProfileConf = { status :: Str }
 
 fn parse_clear_charging_profile_conf(j :: jv.Json) -> ClearChargingProfileConf {
@@ -57,63 +53,41 @@ fn parse_clear_charging_profile_conf(j :: jv.Json) -> ClearChargingProfileConf {
 }
 
 # ---- GetCompositeSchedule ---------------------------------------
-
-type GetCompositeScheduleConf = {
-  status          :: Str,
-  connector_id    :: Option[Int],
-  schedule_start  :: Option[Str],
-  charging_schedule :: Option[jv.Json],
-}
+type GetCompositeScheduleConf = { status :: Str, connector_id :: Option[Int], schedule_start :: Option[Str], charging_schedule :: Option[jv.Json] }
 
 fn parse_get_composite_schedule_conf(j :: jv.Json) -> GetCompositeScheduleConf {
-  {
-    status:            str_field(j, "status", en.accepted()),
-    connector_id:      opt_int_field(j, "connectorId"),
-    schedule_start:    opt_str_field(j, "scheduleStart"),
-    charging_schedule: jv.get_field(j, "chargingSchedule"),
-  }
+  { status: str_field(j, "status", en.accepted()), connector_id: opt_int_field(j, "connectorId"), schedule_start: opt_str_field(j, "scheduleStart"), charging_schedule: jv.get_field(j, "chargingSchedule") }
 }
 
 # ---- GetConfiguration -------------------------------------------
-
 type KeyValue = { key :: Str, readonly :: Bool, value :: Option[Str] }
 
-type GetConfigurationConf = {
-  configuration_key :: List[KeyValue],
-  unknown_key       :: List[Str],
-}
+type GetConfigurationConf = { configuration_key :: List[KeyValue], unknown_key :: List[Str] }
 
 fn parse_key_value(j :: jv.Json) -> KeyValue {
-  {
-    key:      str_field(j, "key", ""),
-    readonly: bool_field(j, "readonly", false),
-    value:    opt_str_field(j, "value"),
-  }
+  { key: str_field(j, "key", ""), readonly: bool_field(j, "readonly", false), value: opt_str_field(j, "value") }
 }
 
 fn parse_get_configuration_conf(j :: jv.Json) -> GetConfigurationConf {
   let cfg_keys := match jv.get_field(j, "configurationKey") {
-    Some(JList(items)) => list.fold(items, [],
-      fn (acc :: List[KeyValue], item :: jv.Json) -> List[KeyValue] {
-        list.concat(acc, [parse_key_value(item)])
-      }),
+    Some(JList(items)) => list.fold(items, [], fn (acc :: List[KeyValue], item :: jv.Json) -> List[KeyValue] {
+      list.concat(acc, [parse_key_value(item)])
+    }),
     _ => [],
   }
   let unk_keys := match jv.get_field(j, "unknownKey") {
-    Some(JList(items)) => list.fold(items, [],
-      fn (acc :: List[Str], item :: jv.Json) -> List[Str] {
-        match item {
-          JStr(s) => list.concat(acc, [s]),
-          _       => acc,
-        }
-      }),
+    Some(JList(items)) => list.fold(items, [], fn (acc :: List[Str], item :: jv.Json) -> List[Str] {
+      match item {
+        JStr(s) => list.concat(acc, [s]),
+        _ => acc,
+      }
+    }),
     _ => [],
   }
   { configuration_key: cfg_keys, unknown_key: unk_keys }
 }
 
 # ---- GetDiagnostics ---------------------------------------------
-
 type GetDiagnosticsConf = { file_name :: Option[Str] }
 
 fn parse_get_diagnostics_conf(j :: jv.Json) -> GetDiagnosticsConf {
@@ -121,7 +95,6 @@ fn parse_get_diagnostics_conf(j :: jv.Json) -> GetDiagnosticsConf {
 }
 
 # ---- GetLocalListVersion ----------------------------------------
-
 type GetLocalListVersionConf = { list_version :: Int }
 
 fn parse_get_local_list_version_conf(j :: jv.Json) -> GetLocalListVersionConf {
@@ -129,7 +102,6 @@ fn parse_get_local_list_version_conf(j :: jv.Json) -> GetLocalListVersionConf {
 }
 
 # ---- RemoteStartTransaction -------------------------------------
-
 type RemoteStartTransactionConf = { status :: Str }
 
 fn parse_remote_start_transaction_conf(j :: jv.Json) -> RemoteStartTransactionConf {
@@ -137,7 +109,6 @@ fn parse_remote_start_transaction_conf(j :: jv.Json) -> RemoteStartTransactionCo
 }
 
 # ---- RemoteStopTransaction --------------------------------------
-
 type RemoteStopTransactionConf = { status :: Str }
 
 fn parse_remote_stop_transaction_conf(j :: jv.Json) -> RemoteStopTransactionConf {
@@ -145,7 +116,6 @@ fn parse_remote_stop_transaction_conf(j :: jv.Json) -> RemoteStopTransactionConf
 }
 
 # ---- ReserveNow -------------------------------------------------
-
 type ReserveNowConf = { status :: Str }
 
 fn parse_reserve_now_conf(j :: jv.Json) -> ReserveNowConf {
@@ -153,7 +123,6 @@ fn parse_reserve_now_conf(j :: jv.Json) -> ReserveNowConf {
 }
 
 # ---- Reset ------------------------------------------------------
-
 type ResetConf = { status :: Str }
 
 fn parse_reset_conf(j :: jv.Json) -> ResetConf {
@@ -161,7 +130,6 @@ fn parse_reset_conf(j :: jv.Json) -> ResetConf {
 }
 
 # ---- SendLocalList ----------------------------------------------
-
 type SendLocalListConf = { status :: Str }
 
 fn parse_send_local_list_conf(j :: jv.Json) -> SendLocalListConf {
@@ -169,7 +137,6 @@ fn parse_send_local_list_conf(j :: jv.Json) -> SendLocalListConf {
 }
 
 # ---- SetChargingProfile -----------------------------------------
-
 type SetChargingProfileConf = { status :: Str }
 
 fn parse_set_charging_profile_conf(j :: jv.Json) -> SetChargingProfileConf {
@@ -177,7 +144,6 @@ fn parse_set_charging_profile_conf(j :: jv.Json) -> SetChargingProfileConf {
 }
 
 # ---- TriggerMessage ---------------------------------------------
-
 type TriggerMessageConf = { status :: Str }
 
 fn parse_trigger_message_conf(j :: jv.Json) -> TriggerMessageConf {
@@ -185,7 +151,6 @@ fn parse_trigger_message_conf(j :: jv.Json) -> TriggerMessageConf {
 }
 
 # ---- UnlockConnector --------------------------------------------
-
 type UnlockConnectorConf = { status :: Str }
 
 fn parse_unlock_connector_conf(j :: jv.Json) -> UnlockConnectorConf {
@@ -193,57 +158,52 @@ fn parse_unlock_connector_conf(j :: jv.Json) -> UnlockConnectorConf {
 }
 
 # ---- UpdateFirmware ---------------------------------------------
-
-type UpdateFirmwareConf = {}
+type UpdateFirmwareConf = {  }
 
 fn parse_update_firmware_conf(_j :: jv.Json) -> UpdateFirmwareConf {
-  {}
+  {  }
 }
 
 # ---- DataTransfer -----------------------------------------------
-
 type DataTransferConf = { status :: Str, data :: Option[Str] }
 
 fn parse_data_transfer_conf(j :: jv.Json) -> DataTransferConf {
-  {
-    status: str_field(j, "status", en.dt_accepted()),
-    data:   opt_str_field(j, "data"),
-  }
+  { status: str_field(j, "status", en.dt_accepted()), data: opt_str_field(j, "data") }
 }
 
 # ---- Field extraction helpers -----------------------------------
-
 fn str_field(j :: jv.Json, key :: Str, default :: Str) -> Str {
   match jv.get_field(j, key) {
     Some(JStr(s)) => s,
-    _             => default,
+    _ => default,
   }
 }
 
 fn int_field(j :: jv.Json, key :: Str, default :: Int) -> Int {
   match jv.get_field(j, key) {
     Some(JInt(n)) => n,
-    _             => default,
+    _ => default,
   }
 }
 
 fn bool_field(j :: jv.Json, key :: Str, default :: Bool) -> Bool {
   match jv.get_field(j, key) {
     Some(JBool(b)) => b,
-    _              => default,
+    _ => default,
   }
 }
 
 fn opt_str_field(j :: jv.Json, key :: Str) -> Option[Str] {
   match jv.get_field(j, key) {
     Some(JStr(s)) => Some(s),
-    _             => None,
+    _ => None,
   }
 }
 
 fn opt_int_field(j :: jv.Json, key :: Str) -> Option[Int] {
   match jv.get_field(j, key) {
     Some(JInt(n)) => Some(n),
-    _             => None,
+    _ => None,
   }
 }
+
