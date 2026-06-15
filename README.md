@@ -1,5 +1,9 @@
 # lex-ocpp
 
+[![CI](https://github.com/alpibrusl/lex-ocpp/actions/workflows/ci.yml/badge.svg)](https://github.com/alpibrusl/lex-ocpp/actions/workflows/ci.yml)
+
+**Part of the [Lex](https://lexlang.org) project** — Energy · [Manifesto](https://lexlang.org/manifesto) · [All packages](https://lexlang.org)
+
 [![CI](https://github.com/alpibrusl/lex-ocpp/actions/workflows/lex.yml/badge.svg?branch=main)](https://github.com/alpibrusl/lex-ocpp/actions/workflows/lex.yml)
 
 OCPP (Open Charge Point Protocol) library for the
