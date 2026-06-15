@@ -12,6 +12,6 @@ lex     = "0.9.7"
 # 0.9.3: net.dial_ws enables outbound wss:// charge-point connections;
 #        permissive-policy fix (#399) unblocks lex ci test suite.
 [dependencies]
-lex-schema = { path = "../lex-schema" }
+lex-schema = { git = "https://github.com/alpibrusl/lex-schema" }
 lex-crypto = { git = "https://github.com/alpibrusl/lex-crypto" }
-lex-web    = { path = "../lex-web" }
+lex-web    = { git = "https://github.com/alpibrusl/lex-web" }
