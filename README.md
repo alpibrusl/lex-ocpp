@@ -6,6 +6,18 @@
 
 [![CI](https://github.com/alpibrusl/lex-ocpp/actions/workflows/lex.yml/badge.svg?branch=main)](https://github.com/alpibrusl/lex-ocpp/actions/workflows/lex.yml)
 
+## Role in EV Fleet
+
+Pure Lex library providing the charge-point↔CSMS wire protocol for OCPP 1.6, 2.0.1, and 2.1. Within this fleet:
+
+- **lex-csms** uses it as the CSMS (server) — parsing inbound `BootNotification`, `StartTransaction`, `MeterValues`, etc. and dispatching to typed handlers
+- **lex-simulator** uses it as the charge-point (client) — building `BootNotification`, `Authorize`, `StartTransaction` frames and sending them over WebSocket
+- **lex-charger** uses it for the full single-CP session state machine — framing every step of the charge cycle
+
+Covers OCPP 1.6, 2.0.1, and 2.1 (including DER, battery swap, and TransactionEvent). Pure core — no effects; WebSocket transport wired in by lex-csms and lex-charger.
+
+---
+
 OCPP (Open Charge Point Protocol) library for the
 [Lex language](https://github.com/alpibrusl/lex-lang), in the spirit of
 [mobilityhouse/ocpp](https://github.com/mobilityhouse/ocpp): the same
