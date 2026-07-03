@@ -63,10 +63,13 @@ fn authenticate(stored_hash :: Str, password :: Str) -> Result[Unit, Str] {
 # ---- Security Profile 3: JWT for OCPP 2.0.1 ---------------------
 # Issue a short-lived HS256 JWT identifying a charge point.
 # `cp_id` becomes the `sub` claim; `ttl_secs` is typically 3600
-# (initial auth) or 300 (re-auth / token refresh).
-fn issue_cp_token(secret :: Bytes, cp_id :: Str, ttl_secs :: Int) -> [time] Str {
+# (initial auth) or 300 (re-auth / token refresh). The caller must
+# supply a unique `jti` (a UUID from your platform's CSPRNG is
+# standard — same contract as hash_password's salt) so tokens can be
+# individually tracked and revoked.
+fn issue_cp_token(secret :: Bytes, cp_id :: Str, ttl_secs :: Int, jti :: Str) -> [time] Str {
   let now := time.now()
-  let claims := { sub: cp_id, iss: "csms", aud: "cp", jti: "", exp: now + ttl_secs, nbf: now, iat: now }
+  let claims := { sub: cp_id, iss: "csms", aud: "cp", jti: jti, exp: now + ttl_secs, nbf: now, iat: now }
   jwt.sign_hs256(secret, claims)
 }
 
