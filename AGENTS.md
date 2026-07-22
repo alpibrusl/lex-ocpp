@@ -21,10 +21,10 @@ Built on top of:
 
 ## 2. Install the Lex toolchain
 
-CI runs against **v0.9.2** pre-built binaries; use the same locally:
+CI runs against **v0.10.7** pre-built binaries; use the same locally:
 
 ```sh
-LEX_VERSION=v0.9.2
+LEX_VERSION=v0.10.7
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)   TARGET=x86_64-unknown-linux-gnu  ;;
   Linux-aarch64)  TARGET=aarch64-unknown-linux-gnu ;;
