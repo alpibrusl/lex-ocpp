@@ -34,7 +34,7 @@ the 0.9.2 release).
 
 ## Build status
 
-`lex ci --no-fmt` passes against vanilla `lex 0.9.2` + the published
+`lex ci --no-fmt` passes against vanilla `lex 0.10.7` + the published
 `lex-schema` with **zero workarounds in source.** Every file under
 `src/`, `tests/`, `examples/`, and `tools/` passes `lex check --strict`,
 and every test suite returns 0 failures:
@@ -476,7 +476,7 @@ under `[io, time, sql]`.
 
 The CI workflow checks out lex-ocpp + lex-schema + lex-web siblings
 into a flat layout (so the `path = "../<sibling>"` deps in `lex.toml`
-resolve cleanly), installs the **pre-built `lex 0.9.2` release binary**
+resolve cleanly), installs the **pre-built `lex 0.10.7` release binary**
 (no Rust toolchain needed on the runner — 30s instead of 90s), runs
 `lex ci --no-fmt`, then the effectful suite as a follow-up step.
 
