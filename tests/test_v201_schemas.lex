@@ -155,9 +155,41 @@ fn test_notify_event_ok() -> Result[Unit, Str] {
   assert_ok_validation(sch.validate_notify_event_req(payload), "notify_event")
 }
 
+# ---- SetChargingProfile ------------------------------------------
+fn sample_charging_schedule_v201() -> jv.Json {
+  let period := JObj([("startPeriod", JInt(0)), ("limit", JFloat(22.0))])
+  JObj([("id", JInt(1)), ("chargingRateUnit", JStr(en.cru_w())), ("chargingSchedulePeriod", JList([period]))])
+}
+
+fn test_set_charging_profile_v201_ok() -> Result[Unit, Str] {
+  let profile := JObj([("id", JInt(1)), ("stackLevel", JInt(0)), ("chargingProfilePurpose", JStr(en.cpp_tx_default_profile())), ("chargingProfileKind", JStr(en.cpk_absolute())), ("chargingSchedule", JList([sample_charging_schedule_v201()]))])
+  let payload := JObj([("evseId", JInt(1)), ("chargingProfile", profile)])
+  assert_ok_validation(sch.validate_set_charging_profile_req(payload), "set_charging_profile v201 ok")
+}
+
+fn test_set_charging_profile_v201_missing_evse_id() -> Result[Unit, Str] {
+  let profile := JObj([("id", JInt(1)), ("stackLevel", JInt(0)), ("chargingProfilePurpose", JStr(en.cpp_tx_default_profile())), ("chargingProfileKind", JStr(en.cpk_absolute())), ("chargingSchedule", JList([sample_charging_schedule_v201()]))])
+  let payload := JObj([("chargingProfile", profile)])
+  assert_err_validation(sch.validate_set_charging_profile_req(payload), "set_charging_profile v201 missing evseId")
+}
+
+fn test_set_charging_profile_v201_bad_purpose() -> Result[Unit, Str] {
+  let profile := JObj([("id", JInt(1)), ("stackLevel", JInt(0)), ("chargingProfilePurpose", JStr("NotARealPurpose")), ("chargingProfileKind", JStr(en.cpk_absolute())), ("chargingSchedule", JList([sample_charging_schedule_v201()]))])
+  let payload := JObj([("evseId", JInt(1)), ("chargingProfile", profile)])
+  assert_err_validation(sch.validate_set_charging_profile_req(payload), "set_charging_profile v201 bad purpose")
+}
+
+# 2.0.1 has no Bidirectional Power Transfer support — "Dynamic" is a
+# 2.1-only ChargingProfileKind addition, and must be rejected here.
+fn test_set_charging_profile_v201_rejects_2_1_only_dynamic_kind() -> Result[Unit, Str] {
+  let profile := JObj([("id", JInt(1)), ("stackLevel", JInt(0)), ("chargingProfilePurpose", JStr(en.cpp_tx_default_profile())), ("chargingProfileKind", JStr("Dynamic")), ("chargingSchedule", JList([sample_charging_schedule_v201()]))])
+  let payload := JObj([("evseId", JInt(1)), ("chargingProfile", profile)])
+  assert_err_validation(sch.validate_set_charging_profile_req(payload), "set_charging_profile v201 rejects Dynamic kind")
+}
+
 # ---- Suite + runner ---------------------------------------------
 fn suite() -> List[Result[Unit, Str]] {
-  [test_boot_v201_ok(), test_boot_v201_missing_nested(), test_boot_v201_bad_reason(), test_heartbeat_v201(), test_authorize_v201_ok(), test_authorize_v201_bad_token_type(), test_transaction_event_ok(), test_transaction_event_missing_seq(), test_status_notification_v201_ok(), test_reset_v201_immediate(), test_clear_cache_ok(), test_cancel_reservation_ok(), test_cancel_reservation_missing(), test_get_variables_ok(), test_get_variables_empty_list(), test_set_variables_ok(), test_get_base_report_ok(), test_get_base_report_bad_enum(), test_log_status_notification_ok(), test_sign_certificate_ok(), test_update_firmware_ok(), test_notify_event_ok()]
+  [test_boot_v201_ok(), test_boot_v201_missing_nested(), test_boot_v201_bad_reason(), test_heartbeat_v201(), test_authorize_v201_ok(), test_authorize_v201_bad_token_type(), test_transaction_event_ok(), test_transaction_event_missing_seq(), test_status_notification_v201_ok(), test_reset_v201_immediate(), test_clear_cache_ok(), test_cancel_reservation_ok(), test_cancel_reservation_missing(), test_get_variables_ok(), test_get_variables_empty_list(), test_set_variables_ok(), test_get_base_report_ok(), test_get_base_report_bad_enum(), test_log_status_notification_ok(), test_sign_certificate_ok(), test_update_firmware_ok(), test_notify_event_ok(), test_set_charging_profile_v201_ok(), test_set_charging_profile_v201_missing_evse_id(), test_set_charging_profile_v201_bad_purpose(), test_set_charging_profile_v201_rejects_2_1_only_dynamic_kind()]
 }
 
 fn run_all() -> Int {

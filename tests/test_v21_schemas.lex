@@ -154,11 +154,39 @@ fn test_update_dynamic_schedule_ok() -> Result[Unit, Str] {
   assert_ok_validation(sch.validate_update_dynamic_schedule_req(payload), "update dynamic schedule")
 }
 
+# ---- SetChargingProfile (Bidirectional Power Transfer / V2G) -----
+fn charging_schedule_v21(period :: jv.Json) -> jv.Json {
+  JObj([("id", JInt(1)), ("chargingRateUnit", JStr(en.cru_w())), ("chargingSchedulePeriod", JList([period]))])
+}
+
+fn test_set_charging_profile_v21_ok() -> Result[Unit, Str] {
+  let period := JObj([("startPeriod", JInt(0)), ("limit", JFloat(22.0))])
+  let profile := JObj([("id", JInt(1)), ("stackLevel", JInt(0)), ("chargingProfilePurpose", JStr(en.cpp_tx_default_profile())), ("chargingProfileKind", JStr(en.cpk_absolute())), ("chargingSchedule", JList([charging_schedule_v21(period)]))])
+  let payload := JObj([("evseId", JInt(1)), ("chargingProfile", profile)])
+  assert_ok_validation(sch.validate_set_charging_profile_req(payload), "set_charging_profile v21 ok")
+}
+
+# The actual V2G wire mechanism: a ChargingSchedulePeriod carrying
+# dischargeLimit, under the LocalGeneration purpose 2.1 adds for
+# exactly this — a real discharge instruction, not a made-up field.
+fn test_set_charging_profile_v21_discharge_limit_ok() -> Result[Unit, Str] {
+  let period := JObj([("startPeriod", JInt(0)), ("limit", JFloat(0.0)), ("dischargeLimit", JFloat(0.0 - 11.0))])
+  let profile := JObj([("id", JInt(1)), ("stackLevel", JInt(0)), ("chargingProfilePurpose", JStr(en.cpp_local_generation())), ("chargingProfileKind", JStr(en.cpk_dynamic())), ("chargingSchedule", JList([charging_schedule_v21(period)]))])
+  let payload := JObj([("evseId", JInt(1)), ("chargingProfile", profile)])
+  assert_ok_validation(sch.validate_set_charging_profile_req(payload), "set_charging_profile v21 dischargeLimit + LocalGeneration + Dynamic")
+}
+
+fn test_set_charging_profile_v21_missing_charging_schedule() -> Result[Unit, Str] {
+  let profile := JObj([("id", JInt(1)), ("stackLevel", JInt(0)), ("chargingProfilePurpose", JStr(en.cpp_tx_default_profile())), ("chargingProfileKind", JStr(en.cpk_absolute())), ("chargingSchedule", JList([]))])
+  let payload := JObj([("evseId", JInt(1)), ("chargingProfile", profile)])
+  assert_err_validation(sch.validate_set_charging_profile_req(payload), "set_charging_profile v21 empty chargingSchedule list")
+}
+
 # ============================================================
 # Suite + runner
 # ============================================================
 fn suite() -> List[Result[Unit, Str]] {
-  [test_boot_v21_ok(), test_authorize_v21_iso15118v20(), test_authorize_v21_vin(), test_transaction_event_discharging(), test_battery_swap_ok(), test_battery_swap_bad_soc(), test_notify_allowed_energy_transfer_ok(), test_notify_allowed_energy_transfer_bad_mode(), test_open_periodic_event_stream_ok(), test_open_periodic_event_stream_too_big_interval(), test_close_periodic_event_stream_ok(), test_notify_periodic_event_stream_ok(), test_get_der_control_minimal(), test_set_der_control_ok(), test_set_der_control_bad_type(), test_clear_der_control_ok(), test_notify_der_alarm_ok(), test_notify_der_start_stop_ok(), test_change_transaction_tariff_ok(), test_notify_web_payment_started_ok(), test_use_priority_charging_ok(), test_update_dynamic_schedule_ok()]
+  [test_boot_v21_ok(), test_authorize_v21_iso15118v20(), test_authorize_v21_vin(), test_transaction_event_discharging(), test_battery_swap_ok(), test_battery_swap_bad_soc(), test_notify_allowed_energy_transfer_ok(), test_notify_allowed_energy_transfer_bad_mode(), test_open_periodic_event_stream_ok(), test_open_periodic_event_stream_too_big_interval(), test_close_periodic_event_stream_ok(), test_notify_periodic_event_stream_ok(), test_get_der_control_minimal(), test_set_der_control_ok(), test_set_der_control_bad_type(), test_clear_der_control_ok(), test_notify_der_alarm_ok(), test_notify_der_start_stop_ok(), test_change_transaction_tariff_ok(), test_notify_web_payment_started_ok(), test_use_priority_charging_ok(), test_update_dynamic_schedule_ok(), test_set_charging_profile_v21_ok(), test_set_charging_profile_v21_discharge_limit_ok(), test_set_charging_profile_v21_missing_charging_schedule()]
 }
 
 fn run_all() -> Int {

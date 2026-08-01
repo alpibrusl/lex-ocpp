@@ -129,6 +129,33 @@ fn validate_reset_req(j :: jv.Json) -> Result[jv.Json, List[e.Error]] {
   s.validate(reset_req_schema(), j)
 }
 
+# ---- SetChargingProfile.req --------------------------------------
+# The one carry-over whose payload shape genuinely changed from 2.0.1:
+# ChargingSchedulePeriod gains dischargeLimit here — 2.1's Bidirectional
+# Power Transfer functional block, the actual wire mechanism a CSMS
+# uses to tell a charge point to export power (V2G/V2X) instead of
+# just capping how much it imports. A negative-power schedule period
+# has no equivalent in 2.0.1's ChargingSchedulePeriod at all.
+fn charging_schedule_period_schema() -> s.ModelSchema {
+  { title: "ChargingSchedulePeriod", description: "OCPP 2.1 — ChargingSchedulePeriod", fields: [s.required_int("startPeriod", [IntNonNegative]), s.required_float("limit", []), s.optional(s.required_int("numberPhases", [IntNonNegative])), s.optional(s.required_float("dischargeLimit", []))] }
+}
+
+fn charging_schedule_schema() -> s.ModelSchema {
+  { title: "ChargingSchedule", description: "OCPP 2.1 — ChargingSchedule", fields: [s.required_int("id", []), s.optional(s.required_str("startSchedule", [StrNonEmpty])), s.optional(s.required_int("duration", [IntNonNegative])), s.required_str("chargingRateUnit", [StrOneOf(en.all_charging_rate_unit())]), s.optional(s.required_float("minChargingRate", [])), s.required_array("chargingSchedulePeriod", KObject(charging_schedule_period_schema()), [ListNonEmpty])] }
+}
+
+fn charging_profile_schema() -> s.ModelSchema {
+  { title: "ChargingProfile", description: "OCPP 2.1 — ChargingProfile", fields: [s.required_int("id", []), s.required_int("stackLevel", [IntNonNegative]), s.required_str("chargingProfilePurpose", [StrOneOf(en.all_charging_profile_purpose())]), s.required_str("chargingProfileKind", [StrOneOf(en.all_charging_profile_kind())]), s.optional(s.required_str("recurrencyKind", [StrOneOf(en.all_recurrency_kind())])), s.optional(s.required_str("validFrom", [StrNonEmpty])), s.optional(s.required_str("validTo", [StrNonEmpty])), s.optional(s.required_str("transactionId", [StrNonEmpty, StrMaxLen(36)])), s.required_array("chargingSchedule", KObject(charging_schedule_schema()), [ListNonEmpty])] }
+}
+
+fn set_charging_profile_req_schema() -> s.ModelSchema {
+  { title: "SetChargingProfileRequest", description: "OCPP 2.1 — SetChargingProfile.req", fields: [s.required_int("evseId", [IntNonNegative]), s.required_object("chargingProfile", charging_profile_schema())] }
+}
+
+fn validate_set_charging_profile_req(j :: jv.Json) -> Result[jv.Json, List[e.Error]] {
+  s.validate(set_charging_profile_req_schema(), j)
+}
+
 # ============================================================
 # v2.1 additions
 # ============================================================
@@ -280,7 +307,7 @@ fn validate_update_dynamic_schedule_req(j :: jv.Json) -> Result[jv.Json, List[e.
 type ActionValidator = { action :: Str, validator :: (jv.Json) -> Result[jv.Json, List[e.Error]] }
 
 fn all_request_validators() -> List[ActionValidator] {
-  [{ action: "Authorize", validator: validate_authorize_req }, { action: "BootNotification", validator: validate_boot_notification_req }, { action: "Heartbeat", validator: validate_heartbeat_req }, { action: "StatusNotification", validator: validate_status_notification_req }, { action: "TransactionEvent", validator: validate_transaction_event_req }, { action: "DataTransfer", validator: validate_data_transfer_req }, { action: "Reset", validator: validate_reset_req }, { action: "BatterySwap", validator: validate_battery_swap_req }, { action: "NotifyAllowedEnergyTransfer", validator: validate_notify_allowed_energy_transfer_req }, { action: "OpenPeriodicEventStream", validator: validate_open_periodic_event_stream_req }, { action: "ClosePeriodicEventStream", validator: validate_close_periodic_event_stream_req }, { action: "NotifyPeriodicEventStream", validator: validate_notify_periodic_event_stream_req }, { action: "GetDERControl", validator: validate_get_der_control_req }, { action: "SetDERControl", validator: validate_set_der_control_req }, { action: "ClearDERControl", validator: validate_clear_der_control_req }, { action: "NotifyDERAlarm", validator: validate_notify_der_alarm_req }, { action: "NotifyDERStartStop", validator: validate_notify_der_start_stop_req }, { action: "ChangeTransactionTariff", validator: validate_change_transaction_tariff_req }, { action: "NotifyWebPaymentStarted", validator: validate_notify_web_payment_started_req }, { action: "UsePriorityCharging", validator: validate_use_priority_charging_req }, { action: "UpdateDynamicSchedule", validator: validate_update_dynamic_schedule_req }]
+  [{ action: "Authorize", validator: validate_authorize_req }, { action: "BootNotification", validator: validate_boot_notification_req }, { action: "Heartbeat", validator: validate_heartbeat_req }, { action: "StatusNotification", validator: validate_status_notification_req }, { action: "TransactionEvent", validator: validate_transaction_event_req }, { action: "DataTransfer", validator: validate_data_transfer_req }, { action: "Reset", validator: validate_reset_req }, { action: "SetChargingProfile", validator: validate_set_charging_profile_req }, { action: "BatterySwap", validator: validate_battery_swap_req }, { action: "NotifyAllowedEnergyTransfer", validator: validate_notify_allowed_energy_transfer_req }, { action: "OpenPeriodicEventStream", validator: validate_open_periodic_event_stream_req }, { action: "ClosePeriodicEventStream", validator: validate_close_periodic_event_stream_req }, { action: "NotifyPeriodicEventStream", validator: validate_notify_periodic_event_stream_req }, { action: "GetDERControl", validator: validate_get_der_control_req }, { action: "SetDERControl", validator: validate_set_der_control_req }, { action: "ClearDERControl", validator: validate_clear_der_control_req }, { action: "NotifyDERAlarm", validator: validate_notify_der_alarm_req }, { action: "NotifyDERStartStop", validator: validate_notify_der_start_stop_req }, { action: "ChangeTransactionTariff", validator: validate_change_transaction_tariff_req }, { action: "NotifyWebPaymentStarted", validator: validate_notify_web_payment_started_req }, { action: "UsePriorityCharging", validator: validate_use_priority_charging_req }, { action: "UpdateDynamicSchedule", validator: validate_update_dynamic_schedule_req }]
 }
 
 fn find_validator(action :: Str) -> Option[(jv.Json) -> Result[jv.Json, List[e.Error]]] {

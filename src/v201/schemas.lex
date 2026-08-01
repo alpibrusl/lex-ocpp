@@ -197,6 +197,30 @@ fn validate_trigger_message_req(j :: jv.Json) -> Result[jv.Json, List[e.Error]] 
   s.validate(trigger_message_req_schema(), j)
 }
 
+# ---- SetChargingProfile.req --------------------------------------
+# ChargingSchedulePeriod has no dischargeLimit in 2.0.1 — that's a 2.1
+# Bidirectional Power Transfer addition, see v21/schemas.lex's own
+# version of this schema.
+fn charging_schedule_period_schema() -> s.ModelSchema {
+  { title: "ChargingSchedulePeriod", description: "OCPP 2.0.1 — ChargingSchedulePeriod", fields: [s.required_int("startPeriod", [IntNonNegative]), s.required_float("limit", []), s.optional(s.required_int("numberPhases", [IntNonNegative]))] }
+}
+
+fn charging_schedule_schema() -> s.ModelSchema {
+  { title: "ChargingSchedule", description: "OCPP 2.0.1 — ChargingSchedule", fields: [s.required_int("id", []), s.optional(s.required_str("startSchedule", [StrNonEmpty])), s.optional(s.required_int("duration", [IntNonNegative])), s.required_str("chargingRateUnit", [StrOneOf(en.all_charging_rate_unit())]), s.optional(s.required_float("minChargingRate", [])), s.required_array("chargingSchedulePeriod", KObject(charging_schedule_period_schema()), [ListNonEmpty])] }
+}
+
+fn charging_profile_schema() -> s.ModelSchema {
+  { title: "ChargingProfile", description: "OCPP 2.0.1 — ChargingProfile", fields: [s.required_int("id", []), s.required_int("stackLevel", [IntNonNegative]), s.required_str("chargingProfilePurpose", [StrOneOf(en.all_charging_profile_purpose())]), s.required_str("chargingProfileKind", [StrOneOf(en.all_charging_profile_kind())]), s.optional(s.required_str("recurrencyKind", [StrOneOf(en.all_recurrency_kind())])), s.optional(s.required_str("validFrom", [StrNonEmpty])), s.optional(s.required_str("validTo", [StrNonEmpty])), s.optional(s.required_str("transactionId", [StrNonEmpty, StrMaxLen(36)])), s.required_array("chargingSchedule", KObject(charging_schedule_schema()), [ListNonEmpty])] }
+}
+
+fn set_charging_profile_req_schema() -> s.ModelSchema {
+  { title: "SetChargingProfileRequest", description: "OCPP 2.0.1 — SetChargingProfile.req", fields: [s.required_int("evseId", [IntNonNegative]), s.required_object("chargingProfile", charging_profile_schema())] }
+}
+
+fn validate_set_charging_profile_req(j :: jv.Json) -> Result[jv.Json, List[e.Error]] {
+  s.validate(set_charging_profile_req_schema(), j)
+}
+
 # ---- ChangeAvailability.req -------------------------------------
 fn change_availability_req_schema() -> s.ModelSchema {
   { title: "ChangeAvailabilityRequest", description: "OCPP 2.0.1 — ChangeAvailability.req", fields: [s.required_str("operationalStatus", [StrOneOf(["Inoperative", "Operative"])]), s.optional(s.required_object("evse", evse_schema()))] }
@@ -321,7 +345,7 @@ fn validate_update_firmware_req(j :: jv.Json) -> Result[jv.Json, List[e.Error]] 
 type ActionValidator = { action :: Str, validator :: (jv.Json) -> Result[jv.Json, List[e.Error]] }
 
 fn all_request_validators() -> List[ActionValidator] {
-  [{ action: "Authorize", validator: validate_authorize_req }, { action: "BootNotification", validator: validate_boot_notification_req }, { action: "Heartbeat", validator: validate_heartbeat_req }, { action: "StatusNotification", validator: validate_status_notification_req }, { action: "TransactionEvent", validator: validate_transaction_event_req }, { action: "MeterValues", validator: validate_meter_values_req }, { action: "DataTransfer", validator: validate_data_transfer_req }, { action: "FirmwareStatusNotification", validator: validate_firmware_status_notification_req }, { action: "SecurityEventNotification", validator: validate_security_event_notification_req }, { action: "Reset", validator: validate_reset_req }, { action: "RequestStartTransaction", validator: validate_request_start_transaction_req }, { action: "RequestStopTransaction", validator: validate_request_stop_transaction_req }, { action: "TriggerMessage", validator: validate_trigger_message_req }, { action: "ChangeAvailability", validator: validate_change_availability_req }, { action: "ClearCache", validator: validate_clear_cache_req }, { action: "CancelReservation", validator: validate_cancel_reservation_req }, { action: "GetVariables", validator: validate_get_variables_req }, { action: "SetVariables", validator: validate_set_variables_req }, { action: "GetBaseReport", validator: validate_get_base_report_req }, { action: "NotifyEvent", validator: validate_notify_event_req }, { action: "LogStatusNotification", validator: validate_log_status_notification_req }, { action: "SignCertificate", validator: validate_sign_certificate_req }, { action: "UpdateFirmware", validator: validate_update_firmware_req }]
+  [{ action: "Authorize", validator: validate_authorize_req }, { action: "BootNotification", validator: validate_boot_notification_req }, { action: "Heartbeat", validator: validate_heartbeat_req }, { action: "StatusNotification", validator: validate_status_notification_req }, { action: "TransactionEvent", validator: validate_transaction_event_req }, { action: "MeterValues", validator: validate_meter_values_req }, { action: "DataTransfer", validator: validate_data_transfer_req }, { action: "FirmwareStatusNotification", validator: validate_firmware_status_notification_req }, { action: "SecurityEventNotification", validator: validate_security_event_notification_req }, { action: "Reset", validator: validate_reset_req }, { action: "RequestStartTransaction", validator: validate_request_start_transaction_req }, { action: "RequestStopTransaction", validator: validate_request_stop_transaction_req }, { action: "TriggerMessage", validator: validate_trigger_message_req }, { action: "SetChargingProfile", validator: validate_set_charging_profile_req }, { action: "ChangeAvailability", validator: validate_change_availability_req }, { action: "ClearCache", validator: validate_clear_cache_req }, { action: "CancelReservation", validator: validate_cancel_reservation_req }, { action: "GetVariables", validator: validate_get_variables_req }, { action: "SetVariables", validator: validate_set_variables_req }, { action: "GetBaseReport", validator: validate_get_base_report_req }, { action: "NotifyEvent", validator: validate_notify_event_req }, { action: "LogStatusNotification", validator: validate_log_status_notification_req }, { action: "SignCertificate", validator: validate_sign_certificate_req }, { action: "UpdateFirmware", validator: validate_update_firmware_req }]
 }
 
 fn find_validator(action :: Str) -> Option[(jv.Json) -> Result[jv.Json, List[e.Error]]] {
