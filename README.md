@@ -82,11 +82,12 @@ lands.
   CS→CP request payloads.
 - **OCPP 2.0.1 surface** (`src/v201/`). Full action catalog (~64 actions
   across both directions), the most-referenced enums, and validators for
-  the 10 highest-traffic Calls (BootNotification, Heartbeat, Authorize,
+  the highest-traffic Calls (BootNotification, Heartbeat, Authorize,
   StatusNotification, TransactionEvent, MeterValues, DataTransfer,
   FirmwareStatusNotification, SecurityEventNotification, Reset,
   RequestStartTransaction, RequestStopTransaction, TriggerMessage,
-  ChangeAvailability).
+  SetChargingProfile, ChangeAvailability, and more — see `schemas.lex`'s
+  `all_request_validators` for the full, up-to-date list).
 - **Four runnable examples**: a complete v1.6 CSMS, a v2.0.1 CSMS,
   an in-process stateful CSMS with effectful handlers, and a
   frame-construction demo for the charger side.
@@ -170,12 +171,16 @@ src/
   v201/
     action.lex            All 64 OCPP 2.0.1 action names
     enums.lex             BootReason, IdTokenType, TransactionEvent, …
-    schemas.lex           lex-schema validators (22 actions)
+    schemas.lex           lex-schema validators (23 actions)
   v21/
     action.lex            All 85+ OCPP 2.1 action names
     enums.lex             v2.0.1 carry-overs + DER / BatterySwap /
                           EnergyTransferMode / TariffChange / PES
-    schemas.lex           Validators for 7 carry-overs + 14 v2.1 additions
+    schemas.lex           Validators for 8 carry-overs (incl.
+                          SetChargingProfile, whose ChargingSchedulePeriod
+                          gains dischargeLimit — the 2.1 Bidirectional
+                          Power Transfer / V2G wire field 2.0.1 has no
+                          equivalent for) + 14 v2.1 additions
 tools/
   gen.lex                 JSON Schema → lex-schema codegen
 tests/

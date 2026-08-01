@@ -532,3 +532,87 @@ fn all_priority_charging_status() -> List[Str] {
   [pc_accepted(), pc_rejected(), pc_no_profile()]
 }
 
+# ---- ChargingProfileKindEnumType -----------------------------------
+# 2.1 adds Dynamic on top of the 2.0.1 baseline (Absolute/Recurring/
+# Relative) — a schedule the CSMS can update on the fly via
+# UpdateDynamicSchedule rather than replacing the whole profile.
+fn cpk_absolute() -> Str {
+  "Absolute"
+}
+
+fn cpk_recurring() -> Str {
+  "Recurring"
+}
+
+fn cpk_relative() -> Str {
+  "Relative"
+}
+
+fn cpk_dynamic() -> Str {
+  "Dynamic"
+}
+
+fn all_charging_profile_kind() -> List[Str] {
+  [cpk_absolute(), cpk_recurring(), cpk_relative(), cpk_dynamic()]
+}
+
+# ---- ChargingProfilePurposeEnumType --------------------------------
+# 2.1 adds PriorityCharging and LocalGeneration on top of the 2.0.1
+# baseline — LocalGeneration is the mechanism a CSMS uses to steer a
+# behind-the-meter generation source (the actual V2G/bidirectional-
+# relevant purpose value); see charging_schedule_period_schema's
+# dischargeLimit for the accompanying wire field.
+fn cpp_charging_station_external_constraints() -> Str {
+  "ChargingStationExternalConstraints"
+}
+
+fn cpp_charging_station_max_profile() -> Str {
+  "ChargingStationMaxProfile"
+}
+
+fn cpp_tx_default_profile() -> Str {
+  "TxDefaultProfile"
+}
+
+fn cpp_tx_profile() -> Str {
+  "TxProfile"
+}
+
+fn cpp_priority_charging() -> Str {
+  "PriorityCharging"
+}
+
+fn cpp_local_generation() -> Str {
+  "LocalGeneration"
+}
+
+fn all_charging_profile_purpose() -> List[Str] {
+  [cpp_charging_station_external_constraints(), cpp_charging_station_max_profile(), cpp_tx_default_profile(), cpp_tx_profile(), cpp_priority_charging(), cpp_local_generation()]
+}
+
+# ---- RecurrencyKindEnumType -----------------------------------------
+fn rck_daily() -> Str {
+  "Daily"
+}
+
+fn rck_weekly() -> Str {
+  "Weekly"
+}
+
+fn all_recurrency_kind() -> List[Str] {
+  [rck_daily(), rck_weekly()]
+}
+
+# ---- ChargingRateUnitEnumType ----------------------------------------
+fn cru_a() -> Str {
+  "A"
+}
+
+fn cru_w() -> Str {
+  "W"
+}
+
+fn all_charging_rate_unit() -> List[Str] {
+  [cru_a(), cru_w()]
+}
+

@@ -478,3 +478,67 @@ fn all_firmware_status() -> List[Str] {
   [fw_downloaded(), fw_download_failed(), fw_downloading(), fw_download_scheduled(), fw_download_paused(), fw_idle(), fw_installation_failed(), fw_installing(), fw_installed(), fw_install_reboot(), fw_install_scheduled(), fw_install_verif_failed(), fw_invalid_signature(), fw_signature_verified()]
 }
 
+# ---- ChargingProfileKindEnumType ---------------------------------
+fn cpk_absolute() -> Str {
+  "Absolute"
+}
+
+fn cpk_recurring() -> Str {
+  "Recurring"
+}
+
+fn cpk_relative() -> Str {
+  "Relative"
+}
+
+fn all_charging_profile_kind() -> List[Str] {
+  [cpk_absolute(), cpk_recurring(), cpk_relative()]
+}
+
+# ---- ChargingProfilePurposeEnumType ------------------------------
+fn cpp_charging_station_external_constraints() -> Str {
+  "ChargingStationExternalConstraints"
+}
+
+fn cpp_charging_station_max_profile() -> Str {
+  "ChargingStationMaxProfile"
+}
+
+fn cpp_tx_default_profile() -> Str {
+  "TxDefaultProfile"
+}
+
+fn cpp_tx_profile() -> Str {
+  "TxProfile"
+}
+
+fn all_charging_profile_purpose() -> List[Str] {
+  [cpp_charging_station_external_constraints(), cpp_charging_station_max_profile(), cpp_tx_default_profile(), cpp_tx_profile()]
+}
+
+# ---- RecurrencyKindEnumType ---------------------------------------
+fn rck_daily() -> Str {
+  "Daily"
+}
+
+fn rck_weekly() -> Str {
+  "Weekly"
+}
+
+fn all_recurrency_kind() -> List[Str] {
+  [rck_daily(), rck_weekly()]
+}
+
+# ---- ChargingRateUnitEnumType --------------------------------------
+fn cru_a() -> Str {
+  "A"
+}
+
+fn cru_w() -> Str {
+  "W"
+}
+
+fn all_charging_rate_unit() -> List[Str] {
+  [cru_a(), cru_w()]
+}
+
