@@ -194,7 +194,7 @@ fn test_definitions_keyword() -> Result[Unit, Str] {
 }
 
 fn test_oneof_discriminated() -> Result[Unit, Str] {
-  let schema := str.concat("{\"title\":\"Event\",", str.concat("\"oneOf\":[{\"type\":\"object\",", str.concat("\"required\":[\"kind\",\"user_id\"],", str.concat("\"properties\":{\"kind\":{\"const\":\"signup\"},", str.concat("\"user_id\":{\"type\":\"string\"}}}},", str.concat("{\"type\":\"object\",", str.concat("\"required\":[\"kind\",\"amount\"],", str.concat("\"properties\":{\"kind\":{\"const\":\"purchase\"},", "\"amount\":{\"type\":\"integer\"}}}]}"))))))))
+  let schema := str.concat("{\"title\":\"Event\",", str.concat("\"oneOf\":[{\"type\":\"object\",", str.concat("\"required\":[\"kind\",\"user_id\"],", str.concat("\"properties\":{\"kind\":{\"const\":\"signup\"},", str.concat("\"user_id\":{\"type\":\"string\"}}},", str.concat("{\"type\":\"object\",", str.concat("\"required\":[\"kind\",\"amount\"],", str.concat("\"properties\":{\"kind\":{\"const\":\"purchase\"},", "\"amount\":{\"type\":\"integer\"}}}]}"))))))))
   match gen.generate(schema) {
     Err(e) => fail(str.concat("parse: ", e)),
     Ok(src) => match assert_contains(src, "fn event_signup_schema()", "signup branch") {
@@ -212,12 +212,25 @@ fn suite() -> List[Result[Unit, Str]] {
   [test_minimal_object(), test_required_and_optional(), test_enum_constraint(), test_string_min_max_len(), test_int_range(), test_int_non_negative(), test_primitive_array(), test_invalid_json(), test_pattern_constraint(), test_format_email(), test_format_uri(), test_format_uuid(), test_format_unknown_dropped(), test_ref_resolution(), test_ref_in_array_items(), test_definitions_keyword(), test_oneof_discriminated()]
 }
 
-fn run_all() -> Int {
+fn run_all_count() -> Int {
   list.fold(suite(), 0, fn (n :: Int, r :: Result[Unit, Str]) -> Int {
     match r {
       Ok(_) => n,
       Err(_) => n + 1,
     }
   })
+}
+
+# `lex test` calls `run_all` and DISCARDS what it returns (lex-lang#757), so a
+# returned failure count reports `ok` however many assertions failed. Only a
+# raise fails a file — the same idiom lex-ems, lex-web and lex-guard use.
+# Run `run_all_count` directly to see which assertions failed.
+fn run_all() -> Unit {
+  if run_all_count() == 0 {
+    ()
+  } else {
+    let __boom := 1 / 0
+    ()
+  }
 }
 
