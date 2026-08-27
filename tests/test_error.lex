@@ -106,8 +106,25 @@ fn test_from_schema_errors_carries_details() -> Result[Unit, Str] {
 }
 
 # ---- Suite + runner ---------------------------------------------
+# The two spellings are the point of the tests above: 1.6 ships the spec's typo
+# and 2.0.1 corrects it. Asserting only that each list CONTAINS its own spelling
+# does not establish that, because it never asks whether the other spelling is
+# absent — a list_contains that had stopped discriminating would satisfy both.
+# This pins the exclusion, which is the actual claim.
+fn each_version_carries_only_its_own_spelling() -> Result[Unit, Str] {
+  if list_contains(oe.all_v16(), "OccurrenceConstraintViolation") {
+    fail("v1.6 must NOT carry the corrected spelling — it ships the spec's typo")
+  } else {
+    if list_contains(oe.all_v201(), "OccurenceConstraintViolation") {
+      fail("v2.0.1 must NOT carry the 1.6 typo — it ships the correction")
+    } else {
+      pass()
+    }
+  }
+}
+
 fn suite() -> List[Result[Unit, Str]] {
-  [test_all_v16_count(), test_all_v201_count(), test_v16_uses_occurence(), test_v201_uses_occurrence(), test_v201_uses_format_violation(), test_not_implemented_constant(), test_protocol_error_constant(), test_not_implemented_err(), test_from_schema_errors_empty(), test_from_schema_errors_carries_details()]
+  [test_all_v16_count(), test_all_v201_count(), test_v16_uses_occurence(), test_v201_uses_occurrence(), test_v201_uses_format_violation(), test_not_implemented_constant(), test_protocol_error_constant(), test_not_implemented_err(), test_from_schema_errors_empty(), test_from_schema_errors_carries_details(), each_version_carries_only_its_own_spelling()]
 }
 
 fn run_all_count() -> Int {
