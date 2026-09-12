@@ -78,7 +78,7 @@ fn issue_cp_token(secret :: Bytes, cp_id :: Str, ttl_secs :: Int, jti :: Str) ->
 fn verify_cp_token(secret :: Bytes, token :: Str) -> [time] Result[jwt.Claims, Str] {
   match jwt.verify_hs256(secret, token) {
     Ok(claims) => Ok(claims),
-    Err(Expired) => Err("token expired"),
+    Err(JwtExpired) => Err("token expired"),
     Err(NotYetValid) => Err("token not yet valid"),
     Err(_) => Err("invalid token"),
   }
